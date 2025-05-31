@@ -10,7 +10,7 @@
 1. Copy .env.example to .env
 2. Configure database connection
 3. Install dependencies: 
-4. Run: 
+4. Run: `python server.py`
 
 ## API Docs
 Available at  when running
