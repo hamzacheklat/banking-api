@@ -1,12 +1,39 @@
-from sanic import Blueprint, HTTPResponse
+from sanic import Blueprint, json
 from sanic_ext import validate, openapi
-from sanic.exceptions import Unauthorized
-from app.core.security import create_access_token
-from app.models.user import User
-from app.core.database import get_db
-from app.api.schemas import UserLoginRequest, UserLoginResponse
+from app.api.schemas import (
+    UserLoginRequest,
+    UserLoginResponse,
+    UserRegisterRequest,
+    UserResponse
+)
+from app.services.auth_service import AuthService
 
 auth_bp = Blueprint("auth", url_prefix="/auth")
+
+
+@auth_bp.post("/register")
+@validate(json=UserRegisterRequest)
+@openapi.definition(
+    body=UserRegisterRequest,
+    response=UserResponse,
+    summary="Register new user",
+    tag="auth"
+)
+async def register(request, body: UserRegisterRequest):
+    user = await AuthService.register_user(
+        email=body.email,
+        password=body.password,
+        first_name=body.first_name,
+        last_name=body.last_name
+    )
+
+    return json({
+        "id": user.id,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name
+    }, status=201)
+
 
 @auth_bp.post("/login")
 @validate(json=UserLoginRequest)
@@ -17,18 +44,13 @@ auth_bp = Blueprint("auth", url_prefix="/auth")
     tag="auth"
 )
 async def login(request, body: UserLoginRequest):
-    async with get_db() as session:
-        user = await session.execute(
-            select(User).where(User.email == body.email)
-        )
-        user = user.scalar_one_or_none()
-        
-        if not user or not user.verify_password(body.password):
-            raise Unauthorized("Invalid credentials")
-        
-        token = create_access_token(user.id)
-        
-        return HTTPResponse.json({
-            "token": token,
-            "token_type": "bearer"
-        })
+    auth_data = await AuthService.login_user(
+        email=body.email,
+        password=body.password
+    )
+
+    return json({
+        "token": auth_data["token"],
+        "token_type": "bearer",
+        "user_id": auth_data["user"].id
+    })
