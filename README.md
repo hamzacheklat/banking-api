@@ -37,3 +37,42 @@ banking-api/
 │   └── schemas/          # Pydantic schemas
 └── server.py             # Application entry point
 ```
+
+## Running APIs in Debug Mode with PyCharm
+
+To run an API in debug mode using PyCharm, follow these steps:
+
+1. Go to **"Edit Configurations"** in the top-right corner of PyCharm and click **"+" → Python** to create a new configuration.
+
+2. In the **"Script path"** field, point to the `sanic` executable located in your virtual environment, like this:
+
+   ```
+   bin/sanic
+   ```
+
+3. In the **"Parameters"** field, add the following:
+
+   ```
+   --server
+   ```
+
+4. In the **"Environment variables"** section, add:
+
+   ```
+   Var=1
+   ```
+
+5. Set the **"Working directory"** to:
+
+   ```
+   /app
+   ```
+
+6. Save the configuration.
+
+You can now run the API either in **debug mode** or **normal mode**. Debug mode allows you to place breakpoints and step through your code using:
+
+* **F7**: Step into
+* **F8**: Step over
+* **F9**: Continue
+
