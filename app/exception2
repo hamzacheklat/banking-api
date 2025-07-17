@@ -1,0 +1,57 @@
+import functools
+import logging
+import traceback
+from typing import Callable, TypeVar, Any, Optional
+from ansible.module_utils.basic import AnsibleModule
+
+T = TypeVar('T')
+logger = logging.getLogger(__name__)
+
+
+def cyberark_exception_handler(function: Callable[..., T]) -> Callable[..., T]:
+    """Decorator to handle exceptions for CyberArk operations with full traceback logging."""
+    @functools.wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        try:
+            logger.debug("Calling function '%s' with args: %s, kwargs: %s",
+                         function.__name__, args, kwargs)
+            return function(*args, **kwargs)
+        except Exception as e:
+            tb = traceback.format_exc()
+            logger.error("Exception in function '%s': %s\nTraceback:\n%s",
+                         function.__name__, repr(e), tb)
+            raise Exception(
+                f"[CyberArk] '{function.__name__}' failed: {type(e).__name__}: {str(e)}"
+            ) from e
+    return wrapper
+
+
+def ansible_module_exception_handler(function: Callable[..., T]) -> Callable[..., T]:
+    """Decorator to handle exceptions in Ansible module logic with proper Ansible error reporting."""
+    @functools.wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        module: Optional[AnsibleModule] = kwargs.get('module', None)
+
+        if not module:
+            for arg in args:
+                if isinstance(arg, AnsibleModule):
+                    module = arg
+                    break
+
+        try:
+            logger.debug("Executing Ansible module function '%s' with args: %s, kwargs: %s",
+                         function.__name__, args, kwargs)
+            return function(*args, **kwargs)
+        except Exception as e:
+            tb = traceback.format_exc()
+            error_msg = (f"[Ansible] Function '{function.__name__}' failed with "
+                         f"{type(e).__name__}: {str(e)}\nTraceback:\n{tb}")
+            logger.error(error_msg)
+
+            if module:
+                module.fail_json(msg=error_msg)
+            else:
+                logger.warning("AnsibleModule instance not found; cannot call fail_json.")
+                raise Exception(error_msg) from e
+
+    return wrapper
