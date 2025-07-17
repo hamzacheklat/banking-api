@@ -1,0 +1,142 @@
+---
+- name: "Test CyberArk Ansible Module"
+  hosts: "{{ custom_host | default('localhost') }}"
+  gather_facts: false
+
+  vars:
+    cyberark_file_cert_path: "/tmp/cyberark.cert"
+    cyberark_file_key_path: "/tmp/cyberark.key"
+
+  tasks:
+    - name: "Include common variables"
+      include_vars:
+        dir: ../../vars
+      no_log: false
+      tags:
+        - always
+
+    - name: "Set CyberArk test parameters"
+      set_fact:
+        cyberark:
+          safename: "test_safe"
+          address: "test.example.com"
+          region: "europe"
+          database: "test_db"
+          env: "dev"
+          cyberark_env: "dev"
+          ecosystem: "test_eco"
+          techno: "oracle"
+          username: "test_user"
+          cert: "{{ cyberark_apigee[cyberark.env]['cert'] }}"
+          key: "{{ cyberark_apigee[cyberark.env]['key'] }}"
+          list_schemas: ["schema1", "schema2"]
+          list_admin: ["admin1"]
+
+    - name: "Validate CyberArk certificate and key are defined"
+      fail:
+        msg: "CyberArk certificates are not defined in cyberark_apigee[{{ cyberark.env }}]"
+      when: >
+        cyberark_apigee[cyberark.env]['cert'] is not defined or 
+        cyberark_apigee[cyberark.env]['cert'] == '' or
+        cyberark_apigee[cyberark.env]['key'] is not defined or 
+        cyberark_apigee[cyberark.env]['key'] == ''
+
+    - name: "Create temporary certificate file"
+      copy:
+        content: "{{ cyberark_apigee[cyberark.env]['cert'] }}"
+        dest: "{{ cyberark_file_cert_path }}"
+        mode: '0600'
+      register: cert_file
+
+    - name: "Create temporary key file"
+      copy:
+        content: "{{ cyberark_apigee[cyberark.env]['key'] }}"
+        dest: "{{ cyberark_file_key_path }}"
+        mode: '0600'
+      register: key_file
+
+    - name: "Verify certificate file exists"
+      stat:
+        path: "{{ cyberark_file_cert_path }}"
+      register: cert_stat
+
+    - name: "Verify key file exists"
+      stat:
+        path: "{{ cyberark_file_key_path }}"
+      register: key_stat
+
+    - name: "Debug file paths"
+      debug:
+        msg: |
+          Cert file: {{ cert_stat.stat.exists }}
+          Key file: {{ key_stat.stat.exists }}
+
+    - name: "Log start time for account creation"
+      set_fact:
+        start_time: "{{ now(utc=true, fmt='%Y-%m-%d %H:%M:%S') }}"
+
+    - name: "Create test account in CyberArk"
+      cyberark_v3:
+        state: "create_account"
+        region: "{{ cyberark.region }}"
+        address: "{{ cyberark.address }}"
+        database: "{{ cyberark.database }}"
+        port: "1521"
+        env: "{{ cyberark.env }}"
+        ecosystem: "{{ cyberark.ecosystem }}"
+        techno: "{{ cyberark.techno }}"
+        cyberark_env: "{{ cyberark.cyberark_env }}"
+        cyberark_cert: "{{ cyberark_file_cert_path }}"
+        cyberark_key: "{{ cyberark_file_key_path }}"
+        list_schemas: "{{ cyberark.list_schemas }}"
+        list_admin: "{{ cyberark.list_admin }}"
+      register: create_result
+
+    - name: "Debug account creation result"
+      debug:
+        var: create_result
+
+    - name: "Get account from CyberArk"
+      cyberark_v3:
+        state: "get_account"
+        region: "{{ cyberark.region }}"
+        safename: "{{ cyberark.safename }}"
+        username: "{{ cyberark.username }}"
+        address: "{{ cyberark.address }}"
+        cyberark_env: "{{ cyberark.cyberark_env }}"
+        cyberark_cert: "{{ cyberark_file_cert_path }}"
+        cyberark_key: "{{ cyberark_file_key_path }}"
+      register: get_result
+      when: create_result.changed
+
+    - name: "Debug get account result"
+      debug:
+        var: get_result
+      when: create_result.changed
+
+    - name: "Delete test account from CyberArk"
+      cyberark_v3:
+        state: "delete_account"
+        region: "{{ cyberark.region }}"
+        safename: "{{ cyberark.safename }}"
+        username: "{{ cyberark.username }}"
+        address: "{{ cyberark.address }}"
+        database: "{{ cyberark.database }}"
+        cyberark_env: "{{ cyberark.cyberark_env }}"
+        cyberark_cert: "{{ cyberark_file_cert_path }}"
+        cyberark_key: "{{ cyberark_file_key_path }}"
+      register: delete_result
+      when: create_result.changed
+
+    - name: "Debug delete account result"
+      debug:
+        var: delete_result
+      when: create_result.changed
+
+    - name: "Log completion time"
+      set_fact:
+        end_time: "{{ now(utc=true, fmt='%Y-%m-%d %H:%M:%S') }}"
+
+    - name: "Show operation duration"
+      debug:
+        msg: "Operation started at {{ start_time }} and completed at {{ end_time }}"
