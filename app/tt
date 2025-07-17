@@ -1,14 +1,163 @@
-class AsyncRunner:
-    @staticmethod
-    def run(coroutine):
-        """Run coroutine safely in both sync and async contexts"""
-        try:
-            loop = asyncio.get_running_loop()
-            if loop.is_running():
-                # Si dans un environnement async existant (Jupyter, etc.)
-                import nest_asyncio
-                nest_asyncio.apply()
-                return loop.run_until_complete(coroutine)
-        except RuntimeError:
-            # Mode synchrone standard
-            return asyncio.run(coroutine)
+import asyncio
+import logging
+from typing import Tuple, Dict, Any
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from ansible.module_utils import cyberark_service, config
+    from ansible.module_utils.exception import exception_handler_module
+except ImportError:
+    from module_utils import cyberark_service, config
+    from module_utils.exception import exception_handler_module
+
+logger = logging.getLogger(__name__)
+
+
+@exception_handler_module
+def get_account(module: AnsibleModule) -> Tuple[bool, Dict[str, Any]]:
+    """Get account details from CyberArk.
+    
+    Args:
+        module: Ansible module object
+        
+    Returns:
+        Tuple with status and account details
+    """
+    ark = cyberark_service.CyberArkService(
+        cyberark_env=module.params['cyberark_env'],
+        cert=module.params['cyberark_cert'],
+        key=module.params['cyberark_key'],
+    )
+    result = asyncio.run(ark.get_account(
+        username=module.params['username'],
+        zone=module.params['zone'],
+        address=module.params['address'],
+        safename=module.params['safename'],
+    ))
+    return False, result
+
+@exception_handler_module
+def create_account(module: AnsibleModule) -> Tuple[bool, Dict[str, Any]]:
+    """Create account in CyberArk.
+    
+    Args:
+        module: Ansible module object
+        
+    Returns:
+        Tuple with creation status and result
+    """
+    ark = cyberark_service.CyberArkService(
+        cyberark_env=module.params['cyberark_env'],
+        cert=module.params['cyberark_cert'],
+        key=module.params['cyberark_key'],
+    )
+    result = asyncio.run(ark.create_account(
+        zone=module.params['region'],
+        address=module.params['address'],
+        database=module.params['database'],
+        port=module.params['port'],
+        env=module.params['env'],
+        ecosystem=module.params['ecosystem'],
+        techno=module.params['techno'],
+        list_schemas=module.params.get('list_schemas'),
+        list_admin=module.params.get('list_admin'),
+    ))
+    return result["created"], result
+
+@exception_handler_module
+def delete_account(module: AnsibleModule) -> Tuple[bool, Dict[str, Any]]:
+    """Delete account from CyberArk.
+    
+    Args:
+        module: Ansible module object
+        
+    Returns:
+        Tuple with deletion status and result
+    """
+    ark = cyberark_service.CyberArkService(
+        cyberark_env=module.params['cyberark_env'],
+        cert=module.params['cyberark_cert'],
+        key=module.params['cyberark_key'],
+    )
+    result = asyncio.run(ark.delete_account(
+        zone=module.params['region'],
+        safename=module.params['safename'],
+        username=module.params['username'],
+        address=module.params['address'],
+        database=module.params['database'],
+    ))
+    return result["deleted"], result
+
+@exception_handler_module
+def get_passwords_or_create_accounts(module: AnsibleModule) -> Tuple[bool, Dict[str, Any]]:
+    """Get passwords or create accounts in CyberArk.
+    
+    Args:
+        module: Ansible module object
+        
+    Returns:
+        Tuple with operation status and result
+    """
+    ark = cyberark_service.CyberArkService(
+        cyberark_env=module.params['cyberark_env'],
+        cert=module.params['cyberark_cert'],
+        key=module.params['cyberark_key'],
+    )
+    result = asyncio.run(ark.get_password_or_create_account(
+        zone=module.params['region'],
+        address=module.params['address'],
+        database=module.params['database'],
+        port=module.params['port'],
+        env=module.params['env'],
+        ecosystem=module.params['ecosystem'],
+        techno=module.params['techno'],
+        list_schemas=module.params.get('list_schemas'),
+        list_admin=module.params.get('list_admin'),
+    ))
+    return result["password_created"], result
+
+def main() -> None:
+    """Main entry point for Ansible module."""
+    choice_map = {
+        "get_account": get_account,
+        "create_account": create_account,
+        "delete_account": delete_account,
+        "get_passwords_or_create_accounts": get_passwords_or_create_accounts,
+    }
+
+    fields = {
+        "region": {"required": True, "type": "str"},
+        "address": {"required": True, "type": "str"},
+        "port": {"required": True, "type": "str"},
+        "database": {"required": True, "type": "str"},
+        "env": {"required": True, "type": "str"},
+        "ecosystem": {"required": True, "type": "str"},
+        "techno": {"required": True, "type": "str"},
+        "list_schemas": {"required": False, "type": "list", "default": None},
+        "list_admin": {"required": False, "type": "list", "default": None},
+        "cyberark_env": {"required": True, "type": "str"},
+        "cyberark_cert": {"required": True, "type": "str"},
+        "cyberark_key": {"required": True, "type": "str"},
+        "safename": {"required": False, "type": "str"},
+        "username": {"required": False, "type": "str"},
+        "state": {"type": "str", "choices": list(choice_map.keys())},
+    }
+
+    module = AnsibleModule(
+        argument_spec=fields,
+        supports_check_mode=False,
+        required_if=[
+            ["state", "get_account", ["region", "safename", "username", "address"]],
+            ["state", "create_account", ["region", "address", "database", "port", "env", 
+                                        "ecosystem", "techno", "cyberark_env", "cyberark_cert", "cyberark_key"]],
+            ["state", "delete_account", ["region", "safename", "username", "address", "database"]],
+            ["state", "get_passwords_or_create_accounts", ["region", "address", "database", "port", "env", 
+                                                          "ecosystem", "techno", "cyberark_env", "cyberark_cert", "cyberark_key"]],
+        ],
+    )
+
+    (has_changed, result) = choice_map.get(module.params['state'])(module)
+    module.exit_json(changed=has_changed, result="success", output=result)
+
+if __name__ == '__main__':
+    main()
