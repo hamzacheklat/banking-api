@@ -1,0 +1,58 @@
+import functools
+import logging
+from typing import Callable, TypeVar, Any, Optional
+from ansible.module_utils.basic import AnsibleModule
+
+T = TypeVar('T')
+
+logger = logging.getLogger(__name__)
+
+
+def cyberark_exception_handler(function: Callable[..., T]) -> Callable[..., T]:
+    """Decorator to handle exceptions for CyberArk operations.
+    
+    Provides consistent error handling and logging for CyberArk service methods.
+    """
+    @functools.wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        try:
+            logger.debug("Executing %s with args: %s, kwargs: %s", 
+                       function.__name__, args, kwargs)
+            return function(*args, **kwargs)
+        except Exception as e:
+            logger.error("Error in %s: %s", function.__name__, str(e), exc_info=True)
+            raise Exception(
+                f"CyberArk operation {function.__name__} failed: {str(e)}"
+            ) from e
+    return wrapper
+
+
+def ansible_module_exception_handler(function: Callable[..., T]) -> Callable[..., T]:
+    """Decorator to handle exceptions for Ansible module operations.
+    
+    Provides consistent error handling and proper Ansible error reporting.
+    """
+    @functools.wraps(function)
+    def wrapper(*args: Any, **kwargs: Any) -> T:
+        module: Optional[AnsibleModule] = None
+        
+        try:
+            # Try to find AnsibleModule in args or kwargs
+            if "module" in kwargs:
+                module = kwargs["module"]
+            else:
+                for arg in args:
+                    if isinstance(arg, AnsibleModule):
+                        module = arg
+                        break
+            
+            logger.debug("Executing Ansible module function %s", function.__name__)
+            return function(*args, **kwargs)
+        except Exception as e:
+            error_msg = f"Module {function.__name__} failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            
+            if module:
+                module.fail_json(msg=error_msg)
+            raise Exception(error_msg) from e
+    return wrapper
