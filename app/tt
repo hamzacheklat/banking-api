@@ -1,32 +1,14 @@
-import asyncio
-from functools import partial
-
-# ... (autres imports)
-
-def run_async(coroutine):
-    """Helper function to run async code in sync context"""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:  # No event loop running
-        return asyncio.run(coroutine)
-    else:
-        # If loop is already running, create a task
-        return loop.run_until_complete(coroutine)
-
-@exception_handler_module
-def get_account(module: AnsibleModule) -> Tuple[bool, Dict[str, Any]]:
-    ark = cyberark_service.CyberArkService(
-        cyberark_env=module.params['cyberark_env'],
-        cert=module.params['cyberark_cert'],
-        key=module.params['cyberark_key'],
-    )
-    coroutine = ark.get_account(
-        username=module.params['username'],
-        zone=module.params['zone'],
-        address=module.params['address'],
-        safename=module.params['safename'],
-    )
-    result = run_async(coroutine)
-    return False, result
-
-# Appliquez la même modification à toutes les autres fonctions (create_account, delete_account, etc.)
+class AsyncRunner:
+    @staticmethod
+    def run(coroutine):
+        """Run coroutine safely in both sync and async contexts"""
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                # Si dans un environnement async existant (Jupyter, etc.)
+                import nest_asyncio
+                nest_asyncio.apply()
+                return loop.run_until_complete(coroutine)
+        except RuntimeError:
+            # Mode synchrone standard
+            return asyncio.run(coroutine)
