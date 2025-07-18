@@ -1,28 +1,26 @@
-import asyncio
-import threading
-from functools import wraps
+from typing import List, Dict, Any, Hashable, TypeVar
 
-_local = threading.local()
+K = TypeVar('K', bound=Hashable)
+V = TypeVar('V')
 
-def async_to_sync_safe(func):
-    """Wrapper qui réutilise la boucle existante ou en crée une nouvelle"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            # Essayer de récupérer la boucle existante
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # Si aucune boucle n'existe, en créer une nouvelle
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        # Stocker dans le contexte thread-local
-        _local.current_loop = loop
-        
-        if loop.is_running():
-            # Si une boucle est déjà en cours, utiliser nest_asyncio
-            import nest_asyncio
-            nest_asyncio.apply(loop)
-        
-        return loop.run_until_complete(func(*args, **kwargs))
-    return wrapper
+def filter_unique_by_key(
+    list_of_dicts: List[Dict[K, V]], 
+    key: K
+) -> List[Dict[K, V]]:
+    """
+    Filtre une liste de dictionnaires en conservant un seul dictionnaire par valeur unique
+    pour la clé spécifiée. Conserve la première occurrence rencontrée.
+    
+    Args:
+        list_of_dicts: Liste de dictionnaires à filtrer
+        key: Clé à utiliser pour identifier les doublons
+    
+    Returns:
+        Liste filtrée sans doublons sur la clé spécifiée
+    """
+    seen = {}
+    for d in list_of_dicts:
+        val = d[key]
+        if val not in seen:
+            seen[val] = d
+    return list(seen.values())
