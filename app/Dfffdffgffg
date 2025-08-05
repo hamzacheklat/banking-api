@@ -1,0 +1,21 @@
+const list = [
+  { tower: '123' },
+  { tower: null },
+  { tower: '' },
+  { name: 'example' },
+  { tower: '456' }
+];
+
+const hasValidTower = list.some(item =>
+  'tower' in item &&
+  item.tower !== null &&
+  item.tower !== '' &&
+  typeof item.tower !== 'undefined' &&
+  !isNaN(Number(item.tower))
+);
+
+if (hasValidTower) {
+  console.log("Il existe au moins un objet avec une valeur 'tower' valide.");
+} else {
+  console.log("Aucun objet n’a une valeur 'tower' valide.");
+}
