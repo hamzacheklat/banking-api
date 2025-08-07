@@ -1,0 +1,99 @@
+def get_recurrent_task_failed_flow(last_n_days: int, top_n: int, vanish_flw_collection, **kwargs):
+    """
+    1- Group the jobs by flow_name and task that caused its failure
+    2- Count the number of occurrences of each task and calculate failure/success rates
+    """
+
+    from datetime import datetime
+
+    # Mise à jour des filtres avec le statut
+    kwargs.update({"status": kwargs.get("status", "").upper()})
+    filter_by = {k: v for (k, v) in kwargs.items() if v}
+
+    # Calcul des dates
+    down_date, up_date = get_down_up_date(last_n_days)
+
+    # Pipeline d'agrégation MongoDB
+    pipeline = [
+        {
+            "$match": {
+                **filter_by,
+                "start_time": {
+                    "$lte": datetime.fromisoformat(up_date),
+                    "$gt": datetime.fromisoformat(down_date)
+                },
+                "status": {"$in": ["FAILED", "SUCCESS"]}
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "flow_name": "$flow_name",
+                    "techno": "$techno",
+                    "name_task_failed": "$name_task_failed",
+                    "task_failed_issue_by": "$task_failed_issue_by",
+                },
+                "total_successes": {
+                    "$sum": {"$cond": [{"$eq": ["$status", "SUCCESS"]}, 1, 0]}
+                },
+                "total_failures": {
+                    "$sum": {"$cond": [{"$eq": ["$status", "FAILED"]}, 1, 0]}
+                },
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "flow_name": "$_id.flow_name",
+                "techno": "$_id.techno",
+                "name_task_failed": "$_id.name_task_failed",
+                "task_failed_issue_by": "$_id.task_failed_issue_by",
+                "number_of_failure": "$total_failures",
+                "success_rate": {
+                    "$round": [
+                        {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        "$total_successes",
+                                        {"$add": ["$total_successes", "$total_failures"]}
+                                    ]
+                                },
+                                100
+                            ]
+                        },
+                        2
+                    ]
+                },
+                "failed_rate": {
+                    "$round": [
+                        {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        "$total_failures",
+                                        {"$add": ["$total_successes", "$total_failures"]}
+                                    ]
+                                },
+                                100
+                            ]
+                        },
+                        2
+                    ]
+                }
+            }
+        },
+        {
+            "$sort": {"number_of_failure": -1}
+        },
+        {
+            "$limit": top_n
+        }
+    ]
+
+    # Exécution de la requête d'agrégation
+    group_task_cause_fail = list(
+        vanish_flw_collection.generic_flow_collection_request(pipeline=pipeline)
+    )
+
+    return group_task_cause_fail
