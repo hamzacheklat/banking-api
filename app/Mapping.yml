@@ -1,0 +1,30 @@
+- name: For each l_cyberark.Account add keys grant and login_profile (hardcoded lists)
+  set_fact:
+    l_cyberark:
+      Account: >-
+        {{ l_cyberark.Account |
+           map('combine', {
+             'grant': ['CONNECT', 'RESOURCE'],
+             'login_profile': ['DEFAULT']
+           }) |
+           list }}
+
+
+
+# affectation stdout get_password_or_create_result >>> l_cyberark.Account
+- name: Affect stdout get_password_or_create_result >>> l_cyberark.Account
+  set_fact:
+    l_cyberark:
+      Account: "{{ get_password_or_create_result.results | map(attribute='stdout') | map('from_json') | list }}"
+
+# for each l_cyberark.Account add keys (grant, login_profile)
+- name: For each l_cyberark.Account add keys grant and login_profile
+  set_fact:
+    l_cyberark:
+      Account: >-
+        {{ l_cyberark.Account |
+           map('combine', {
+             'grant': grant,
+             'login_profile': login_profile
+           }) |
+           list }}
