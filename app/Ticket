@@ -1,0 +1,42 @@
+Voici une version en anglais, reformulée de façon professionnelle pour Jira, avec une table légèrement enrichie pour plus de clarté.
+
+---
+
+**Ticket Summary**
+Implement a mechanism to enable or disable products available in the marketplace.
+
+**Description**
+The goal of this ticket is to introduce a system that allows administrators to activate or deactivate marketplace products via the global API and a dedicated configuration table in the product repository. This will provide better control over product availability.
+
+**Tasks**
+
+1. **Database Changes**
+   Create a new table in the repository with the following columns:
+
+   * `product_id` (string / UUID) – unique identifier of the product
+   * `product_name` (string) – descriptive product name
+   * `is_active` (boolean) – indicates whether the product is enabled (`true`) or disabled (`false`)
+   * `last_modified_by` (string) – user or process that made the last change
+   * `last_modified_at` (timestamp) – date and time of the last modification
+   * `created_at` (timestamp) – date and time the record was created
+
+2. **API Development**
+   Add two new endpoints to the global API:
+
+   * **GET** `/products/status` – Retrieve the status of all products
+   * **POST** `/products/{product_id}/status` – Enable or disable a specific product
+
+3. **Policy Implementation**
+   Create and apply a **rego** policy to control activation/deactivation logic and ensure proper permissions are enforced.
+
+**Acceptance Criteria**
+
+* Products can be activated or deactivated through the API
+* The database table accurately reflects current product status and modification history
+* Only authorized users can modify product activation status
+* API responses are documented and follow existing standards
+
+---
+
+Si tu veux, je peux aussi te préparer une **version plus courte et synthétique** pour l’intitulé et la description du ticket Jira, tout en gardant ce niveau de détails dans les commentaires.
+Veux-tu que je te prépare cette version compacte ?
