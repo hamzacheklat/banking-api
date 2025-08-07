@@ -1,0 +1,111 @@
+def get_recurrent_task_failed_flow(
+    last_n_days: int,
+    top_n: int,
+    vanish_flw_collection,
+    **kwargs
+):
+    """
+    Analyze failed tasks in flows over a given time period.
+
+    1. Filter flow runs by time range and status ("FAILED" or "SUCCESS")
+    2. Group by flow_name + failed task + technology
+    3. Calculate success and failure rates per group
+    4. Return the top_n most frequent failed tasks
+    """
+
+    from datetime import datetime
+
+    # 1. Build filters
+    status = kwargs.get("status", "").upper()
+    if status:
+        kwargs["status"] = status
+
+    filter_by = {k: v for k, v in kwargs.items() if v}
+
+    # 2. Define time range
+    down_date, up_date = get_down_up_date(last_n_days)
+
+    # 3. Build MongoDB aggregation pipeline
+    pipeline = [
+        {
+            "$match": {
+                **filter_by,
+                "start_time": {
+                    "$lte": datetime.fromisoformat(up_date),
+                    "$gt": datetime.fromisoformat(down_date)
+                },
+                "status": {"$in": ["FAILED", "SUCCESS"]}
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "flow_name": "$flow_name",
+                    "techno": "$techno",
+                    "task_name_failed": "$name_task_failed",
+                    "task_failed_issue_by": "$task_failed_issue_by"
+                },
+                "total_successes": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$status", "SUCCESS"]}, 1, 0]
+                    }
+                },
+                "total_failures": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$status", "FAILED"]}, 1, 0]
+                    }
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "flow_name": "$_id.flow_name",
+                "techno": "$_id.techno",
+                "task_name_failed": "$_id.task_name_failed",
+                "task_failed_issue_by": "$_id.task_failed_issue_by",
+                "number_of_failure": "$total_failures",
+                "success_rate": {
+                    "$round": [
+                        {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        "$total_successes",
+                                        {"$add": ["$total_successes", "$total_failures"]}
+                                    ]
+                                },
+                                100
+                            ]
+                        },
+                        2
+                    ]
+                },
+                "failed_rate": {
+                    "$round": [
+                        {
+                            "$multiply": [
+                                {
+                                    "$divide": [
+                                        "$total_failures",
+                                        {"$add": ["$total_successes", "$total_failures"]}
+                                    ]
+                                },
+                                100
+                            ]
+                        },
+                        2
+                    ]
+                }
+            }
+        },
+        {"$sort": {"number_of_failure": -1}},
+        {"$limit": top_n}
+    ]
+
+    # 4. Execute aggregation pipeline and return results
+    results = list(
+        vanish_flw_collection.generic_flow_collection_request(pipeline=pipeline)
+    )
+
+    return results
