@@ -1,0 +1,12 @@
+{
+  title: "Failure Rate",
+  key: "failed_rate",
+  defaultSortOrder: "descend",
+  sorter: (a, b) => parseFloat(a.failed_rate) - parseFloat(b.failed_rate)
+},
+{
+  title: "Success Rate",
+  key: "success_rate",
+  defaultSortOrder: "descend",
+  sorter: (a, b) => parseFloat(a.success_rate) - parseFloat(b.success_rate)
+}
