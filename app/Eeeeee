@@ -1,0 +1,96 @@
+Parfait, voici **l'absolution complète** pour que ton routing Vue fonctionne avec à la fois :
+
+* un **paramètre de chemin** (`:flow_name`)
+* des **paramètres de requête** (`last_n_days`, `name_task_failed`)
+* tout ça passé **proprement en props** à ton composant
+
+---
+
+### ✅ Étape 1 : router/index.js
+
+Modifie ta route `/Flows/:flow_name` pour **extraire aussi les query params** et les passer en `props` :
+
+```js
+import { createWebHashHistory, createRouter } from "vue-router";
+import DataFlowsSummary from "@/components/flows/DataFlowsSummary.vue";
+import DataFlowDetails from "@/components/flows/DataFlowDetails.vue";
+
+const routes = [
+  { path: "/", redirect: "/Flows" },
+  { path: "/Flows", component: DataFlowsSummary },
+  {
+    path: "/Flows/:flow_name",
+    component: DataFlowDetails,
+    props: route => ({
+      flow_name: route.params.flow_name,
+      last_n_days: route.query.last_n_days,
+      name_task_failed: route.query.name_task_failed
+    })
+  }
+];
+
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes
+});
+
+export { router };
+```
+
+---
+
+### ✅ Étape 2 : DataFlowDetails.vue
+
+Dans ton composant `DataFlowDetails.vue`, déclare les props attendues :
+
+```vue
+<script>
+export default {
+  props: ['flow_name', 'last_n_days', 'name_task_failed'],
+  mounted() {
+    console.log('flow_name:', this.flow_name);
+    console.log('last_n_days:', this.last_n_days);
+    console.log('name_task_failed:', this.name_task_failed);
+  }
+}
+</script>
+```
+
+---
+
+### ✅ Étape 3 : Construction du lien (dans DataFlowsSummary.vue)
+
+Quand tu construis ton lien `flow_detail_link`, utilise bien `URLSearchParams` :
+
+```js
+const params = new URLSearchParams({
+  last_n_days: this.last_n_days,
+  name_task_failed: el.name_task_failed
+});
+
+flow_detail_link: `/Flows/${el.flow_name}?${params.toString()}`
+```
+
+---
+
+### ✅ Résultat attendu
+
+Quand tu cliques sur "View details", ton URL ressemblera à :
+
+```
+/#/Flows/oracle_flow?last_n_days=1&name_task_failed=action
+```
+
+Et dans `DataFlowDetails.vue`, tu auras automatiquement :
+
+```js
+this.flow_name === "oracle_flow"
+this.last_n_days === "1"
+this.name_task_failed === "action"
+```
+
+🎉 **Tout sera injecté proprement comme props.**
+
+---
+
+Si tu veux, je peux te générer tous les fichiers prêts à copier-coller. Mais ce qui précède est déjà ton "absolution Vue 3 officielle" 😄
