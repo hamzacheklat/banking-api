@@ -1,0 +1,35 @@
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+
+# URI Oracle
+URI = f"oracle://{user_name}:{user_password}@{db_host}:{db_port}/{db_service}"
+
+# Création session
+def _db(uri=URI):
+    db_engine = create_engine(uri)
+    session_factory = sessionmaker(bind=db_engine)
+    return session_factory()
+
+# Insertion d'une ligne
+def insert_data(product_name, action_name, status, updated_by):
+    session = _db()
+    conn = session.connection()
+    
+    insert_query = text("""
+        INSERT INTO product_action_available 
+        (product_name, action_name, status, updated_by) 
+        VALUES (:product_name, :action_name, :status, :updated_by)
+    """)
+    
+    conn.execute(insert_query, {
+        "product_name": product_name,
+        "action_name": action_name,
+        "status": status,
+        "updated_by": updated_by
+    })
+    
+    conn.commit()
+    print("✅ Insertion réussie !")
+
+if __name__ == "__main__":
+    insert_data("Produit_Test", "Action_Test", "ACTIVE", "Admin")
