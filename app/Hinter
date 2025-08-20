@@ -1,0 +1,74 @@
+from typing import Dict, Any, List
+
+
+class ProductActionAvailableService(BaseService):
+    def __init__(self, product_name: str) -> None:
+        """
+        Service layer for managing available product actions.
+
+        Args:
+            product_name (str): The name of the product to which the actions belong.
+        """
+        APP_LOGGER.info(
+            f"Initializing ProductActionAvailableService with product name {product_name}"
+        )
+        self.product_name: str = product_name
+
+    @classmethod
+    def get_all(cls) -> List[Dict[str, Any]]:
+        """
+        Retrieve all available product actions across all products.
+
+        Returns:
+            List[Dict[str, Any]]: A list of serialized product actions.
+        """
+        raw_data = ProductActionAvailableModelController.all()
+        return ProductActionAvailableModelController.dump_many(raw_data)
+
+    def get_filtered_products(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Retrieve product actions filtered by specific criteria.
+
+        Args:
+            filters (Dict[str, Any]): A dictionary of filtering criteria.
+                Example: {"action_name": "start"}
+
+        Returns:
+            List[Dict[str, Any]]: A list of serialized product actions matching the filters.
+        """
+        raw_data = ProductActionAvailableModelController.filter_by_keys(
+            product_name=self.product_name, **filters
+        )
+        return ProductActionAvailableModelController.dump_many(raw_data)
+
+    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new product action for the given product.
+
+        Args:
+            payload (Dict[str, Any]): Dictionary containing action details.
+                Expected keys include:
+                    - action_name (str): The name of the action to add.
+
+        Returns:
+            Dict[str, Any]: Serialized representation of the created action.
+
+        Raises:
+            ValueError: If the action already exists for this product.
+        """
+        existing = ProductActionAvailableModelController.filter_by_keys(
+            product_name=self.product_name,
+            action_name=payload.get("action_name"),
+        )
+
+        if existing:
+            raise ValueError(
+                f"Action '{payload.get('action_name')}' already exists "
+                f"for product '{self.product_name}'"
+            )
+
+        instance_model = ProductActionAvailableModelController.create(
+            product_name=self.product_name,
+            **payload,
+        )
+        return ProductActionAvailableModelController.dump_instance(instance_model)
