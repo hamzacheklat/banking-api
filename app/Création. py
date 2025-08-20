@@ -1,0 +1,98 @@
+Perfect 👍 let’s make it clean with **type hints** and **docstrings** so your service and endpoint are self-documenting and IDE-friendly.
+
+---
+
+### Service with type hints + docstrings
+
+```python
+from typing import Dict, Any
+
+
+class ProductActionAvailableService(BaseService):
+    def __init__(self, product_name: str) -> None:
+        """
+        Service layer for managing available product actions.
+
+        Args:
+            product_name (str): The name of the product to which the actions belong.
+        """
+        self.product_name = product_name
+
+    def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new product action for the given product.
+
+        Args:
+            payload (Dict[str, Any]): Dictionary containing action details.
+                Expected keys include:
+                    - action_name (str): The name of the action to add.
+
+        Returns:
+            Dict[str, Any]: Serialized representation of the created action.
+
+        Raises:
+            ValueError: If the action already exists for this product.
+        """
+        existing = ProductActionAvailableModelController.filter_by_keys(
+            product_name=self.product_name,
+            action_name=payload.get("action_name"),
+        )
+
+        if existing:
+            raise ValueError(
+                f"Action '{payload.get('action_name')}' already exists "
+                f"for product '{self.product_name}'"
+            )
+
+        instance_model = ProductActionAvailableModelController.create(
+            product_name=self.product_name,
+            **payload,
+        )
+        return ProductActionAvailableModelController.dump_instance(instance_model)
+```
+
+---
+
+### Endpoint with type hints + docstrings
+
+```python
+from sanic.request import Request
+from sanic.response import json, HTTPResponse
+
+
+def add_product_action(request: Request, product_name: str) -> HTTPResponse:
+    """
+    HTTP endpoint to create a product action.
+
+    This endpoint attempts to create a new action for the given product.
+    If the action already exists, it returns a 409 Conflict.
+
+    Args:
+        request (Request): The incoming Sanic HTTP request.
+        product_name (str): The product name from the URL path.
+
+    Returns:
+        HTTPResponse: A JSON response containing the created action (201 Created)
+                      or an error message (409 Conflict).
+    """
+    payload: Dict[str, str] = {k: v.lower() for k, v in request.json.items()}
+    service = ProductActionAvailableService(product_name)
+
+    try:
+        action = service.create(payload)
+        return json(action, status=201)
+    except ValueError as e:
+        return json({"message": str(e)}, status=409)
+```
+
+---
+
+### ✅ Benefits now
+
+* **Type hints** → IDE autocomplete + static analysis (`mypy`, `pylance`).
+* **Docstrings** → anyone reading your code (or using Swagger, Sphinx, etc.) understands what each method/endpoint does.
+* **Consistent exception handling** → only one business exception (`ValueError`).
+
+---
+
+👉 Do you want me to also **replace `ValueError` with a custom exception class** (`ProductActionConflictError`) so the service communicates intent more explicitly?
