@@ -1,0 +1,2 @@
+wget https://files.pythonhosted.org/packages/.../setuptools-40.8.0-py2.py3-none-any.whl
+pip install setuptools-40.8.0-py2.py3-none-any.whl
