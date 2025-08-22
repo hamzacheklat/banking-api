@@ -1,0 +1,27 @@
+- name: "Debug current working directory"
+  debug:
+    msg: "{{ ansible_env.PWD }}"
+
+- name: "List the contents of the current directory"
+  command: "ls -l"
+  register: ls_output
+
+- name: "Show the directory contents"
+  debug:
+    var: ls_output.stdout_lines
+
+- name: "List the contents of the directory recursively"
+  command: "ls -R"
+  register: ls_recursive_output
+
+- name: "Show recursive directory contents"
+  debug:
+    var: ls_recursive_output.stdout_lines
+
+- name: "Find vars directory"
+  command: "find . -type d -name 'vars'"
+  register: find_output
+
+- name: "Show found directories"
+  debug:
+    var: find_output.stdout_lines
