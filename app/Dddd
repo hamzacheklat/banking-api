@@ -1,0 +1,9 @@
+- name: Décrypter et charger le fichier cyberark_vars
+  hosts: localhost
+  vars_files:
+    - ./vars/cyberark.yml   # Fichier chiffré, déjà référencé comme un vars_file
+
+  tasks:
+    - name: Afficher les variables
+      debug:
+        msg: "{{ cyberark_vars }}"
