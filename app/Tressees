@@ -1,0 +1,31 @@
+- name: "Play test cyberark ansible module"
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  tasks:
+    - name: Copier le fichier vars/cyberark.yml dans /tmp
+      copy:
+        src: vars/cyberark.yml
+        dest: /tmp/cyberark.yml
+        mode: '0600'
+        force: true  # Pour écraser s'il existe déjà
+      tags: always
+
+    - name: Charger les variables depuis /tmp/cyberark.yml
+      include_vars:
+        file: /tmp/cyberark.yml
+        name: cyberark
+
+    - name: Utiliser les variables dans le module CyberArk
+      cyberark_apigee:
+        address: "{{ cyberark.address }}"
+        port: "{{ cyberark.port }}"
+        database: "{{ cyberark.database }}"
+        ecosystem: "{{ cyberark.ecosystem }}"
+        techno: "{{ cyberark.techno }}"
+        cyberark_env: "{{ cyberark.cyberark_env }}"
+        env: "{{ cyberark.env }}"
+        parallel: "{{ cyberark.parallel }}"
+        action: "create_account"
+      register: create_result
