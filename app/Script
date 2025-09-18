@@ -1,0 +1,48 @@
+import os
+import click
+from sqlalchemy.orm import Session
+from base_model_controller import db_session
+from product_action_available import ProductActionAvailable
+
+
+REGIONS = ["emea", "amer", "apac"]
+ENVS = ["dev", "stg", "prd"]
+
+
+@click.command()
+@click.option("--products-dir", required=True, help="Chemin vers le dossier products")
+def load_products_actions(products_dir: str):
+    """
+    Charger les produits et actions dans la table product_action_available
+    """
+    session: Session = db_session()
+
+    for product_name in os.listdir(products_dir):
+        product_path = os.path.join(products_dir, product_name)
+
+        if not os.path.isdir(product_path):
+            continue
+
+        actions_dir = os.path.join(product_path, "actions")
+        if not os.path.exists(actions_dir):
+            click.echo(f"⚠️ Pas de dossier actions pour {product_name}")
+            continue
+
+        for action_name in os.listdir(actions_dir):
+            for region in REGIONS:
+                for env in ENVS:
+                    new_entry = ProductActionAvailable(
+                        product_name=product_name,
+                        action_name=action_name,
+                        status="open",
+                        region=region,
+                        env=env,
+                    )
+                    session.add(new_entry)
+
+    session.commit()
+    click.echo("✅ Produits et actions insérés avec succès !")
+
+
+if __name__ == "__main__":
+    load_products_actions()
