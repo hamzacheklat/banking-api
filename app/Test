@@ -1,0 +1,18 @@
+call_api_open_close_action(db_name_input, modification_input, region_input, env_input, product_name_input) = body if {
+    response := http.send({
+        "method": "GET",
+        "url": concat("", [
+            "https://beta.uat.services/",
+            db_env,
+            ".xmp.net.intra/precheck/product_action/",
+            product_name_input,
+            "/status"
+        ]),
+        "headers": {
+            "Authorization": concat("Bearer ", [precheck_token])
+        },
+        "timeout": "2s"
+    })
+
+    body == response.body
+}
