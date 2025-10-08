@@ -1,0 +1,25 @@
+this.gridOptions = {
+  columnDefs: [
+    {
+      headerName: 'EXTRACTS',
+      field: 'extract',
+      rowGroup: true,
+      hide: true, // on garde la colonne cachée
+      cellRendererParams: {
+        status: 'extract_status'
+      }
+    },
+    // autres colonnes...
+  ],
+
+  // 👇 cette partie permet de customiser la colonne de groupe
+  autoGroupColumnDef: {
+    headerName: 'EXTRACTS',
+    cellRenderer: 'replicatStatusRenderer', // ton composant custom
+    cellRendererParams: (params) => ({
+      field: 'extract',
+      status: 'extract_status'
+    }),
+    checkboxSelection: true // active le checkbox sur la colonne de groupe
+  },
+};
