@@ -1,0 +1,38 @@
+const gridOptions = {
+  rowSelection: 'multiple',          // important
+  groupSelectsChildren: true,        // ✅ coche/décoche les enfants avec la checkbox du groupe
+  groupSelectsFiltered: true,        // optionnel : ne coche que les enfants filtrés
+  suppressRowClickSelection: true,   // recommandé pour ne pas cocher au clic sur la ligne
+
+  autoGroupColumnDef: {
+    headerName: 'EXTRACTS',
+    field: 'extract',
+    cellRendererParams: {
+      checkbox: true,               // ✅ active la checkbox sur le groupe
+      suppressCount: false,         // affiche le nombre d’enfants à côté
+    }
+  },
+
+  columnDefs: [
+    {
+      headerName: 'SOURCE DATABASE',
+      field: 'source_database',
+      rowGroup: true,
+      hide: true,
+    },
+    {
+      headerName: 'EXTRACTS',
+      field: 'extract',
+      rowGroup: true,
+      hide: true,
+      cellRenderer: 'replicatStatusRenderer',
+      cellRendererParams: { status: 'extract_status' }
+    },
+    {
+      headerName: 'DISTRIBUTION PATH',
+      field: 'dist_path',
+      cellRenderer: 'flowsStatusRenderer',
+      cellRendererParams: { status: 'dist_path_status' }
+    }
+  ]
+};
