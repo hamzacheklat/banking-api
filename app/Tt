@@ -1,0 +1,201 @@
+Parfait ! Voici le **code complet** et propre pour :
+
+* Rendre `replicatStatusRenderer` **générique** → renommé en `statusRenderer`.
+* Pouvoir l’utiliser aussi dans la colonne `EXTRACTS`.
+* Ajouter les **checkboxes sur les lignes groupées**.
+
+---
+
+## ✅ 1. **Composant `status-renderer.component.ts` (ancien `replicat-status-renderer.component.ts`)**
+
+```ts
+import { Component } from '@angular/core';
+import { ICellRendererAngularComp } from 'ag-grid-community/angular';
+
+@Component({
+  selector: 'app-status-cell',
+  template: `
+    <div *ngIf="isGrouping">
+      <span class="fa fa-circle" style="margin-left: 5px"
+        [ngClass]="{
+          'running': dataStatus === 'RUNNING',
+          'stopped': dataStatus === 'STOPPED',
+          'abended': dataStatus === 'ABENDED' || dataStatus === 'KILLED'
+        }">
+      </span>
+      <span style="margin-left: 5px">{{ value }}</span>
+    </div>
+    <div *ngIf="!isGrouping">
+      <span class="fa fa-circle" style="margin-left: 5px"
+        [ngClass]="{
+          'running': dataStatus === 'RUNNING',
+          'stopped': dataStatus === 'STOPPED',
+          'abended': dataStatus === 'ABENDED' || dataStatus === 'KILLED'
+        }">
+      </span>
+    </div>
+  `,
+  styles: [
+    `
+      .running {
+        color: #66AD25;
+      }
+      .stopped {
+        color: #FF9723;
+      }
+      .abended {
+        color: #CC333D;
+      }
+    `
+  ]
+})
+export class StatusRendererComponent implements ICellRendererAngularComp {
+  public value: string;
+  public dataStatus: string;
+  public isGrouping: boolean;
+  public group: number;
+
+  agInit(params: any): void {
+    this.value = params.value;
+    this.isGrouping = params.node.group;
+    this.group = this.isGrouping ? params.node.childrenAfterFilter.length : null;
+
+    // Prend le champ de statut dynamiquement depuis params
+    if (params.data && params.status) {
+      this.dataStatus = params.data[params.status];
+    } else {
+      this.dataStatus = this.getStatus(params);
+    }
+  }
+
+  getStatus(params: any): string {
+    let dataStatus = '';
+    const statusField = params.status;
+
+    if (!statusField) return dataStatus;
+
+    params.node.allLeafChildren.forEach((child) => {
+      const status = child.data[statusField];
+      if (status === 'ABENDED') {
+        dataStatus = 'ABENDED';
+      } else if (status === 'STOPPED' && dataStatus !== 'ABENDED') {
+        dataStatus = 'STOPPED';
+      } else if (status === 'RUNNING' && !dataStatus) {
+        dataStatus = 'RUNNING';
+      }
+    });
+
+    return dataStatus;
+  }
+
+  refresh(): boolean {
+    return false;
+  }
+}
+```
+
+---
+
+## ✅ 2. **Déclaration du renderer dans `app.module.ts`**
+
+Dans `@NgModule` :
+
+```ts
+import { StatusRendererComponent } from './path/to/status-renderer.component';
+
+@NgModule({
+  declarations: [
+    StatusRendererComponent,
+    // autres composants...
+  ],
+  imports: [
+    // ...
+  ],
+})
+export class AppModule {}
+```
+
+Et dans `components:` si vous avez une config AG-Grid avec Angular:
+
+```ts
+AgGridModule.withComponents([
+  StatusRendererComponent
+])
+```
+
+---
+
+## ✅ 3. **Configuration des colonnes AG-Grid**
+
+Voici la partie pour les colonnes `EXTRACTS` et `REPLICAT` :
+
+```ts
+{
+  headerName: 'EXTRACTS',
+  field: 'extract',
+  checkboxSelection: checkboxSelection, // => pour activer la checkbox
+  cellRenderer: 'statusRenderer',
+  cellRendererParams: {
+    field: 'extract',
+    status: 'extract_status'
+  },
+  rowGroup: true,
+  hide: true
+},
+{
+  headerName: 'REPLICAT',
+  field: 'replicat',
+  checkboxSelection: checkboxSelection,
+  cellRenderer: 'statusRenderer',
+  cellRendererParams: {
+    field: 'replicat',
+    status: 'replicat_status'
+  },
+  suppressSizeToFit: true,
+  width: 160
+}
+```
+
+---
+
+## ✅ 4. **Fonction `checkboxSelection`**
+
+Ajoute cette fonction dans ton fichier TS où tu configures la grille :
+
+```ts
+checkboxSelection(params) {
+  // Active la checkbox pour les lignes groupées ou individuelles
+  return true;
+}
+```
+
+Ou, pour la restreindre uniquement aux groupes :
+
+```ts
+checkboxSelection(params) {
+  return params.node.group === true;
+}
+```
+
+---
+
+## ✅ 5. **Renommer dans la config AG-Grid (si besoin)**
+
+Si tu renommes `replicatStatusRenderer` → `statusRenderer`, n'oublie pas de mettre à jour partout dans ta config et les imports.
+
+---
+
+## ✅ 6. **Optionnel : Ajout d’action par checkbox**
+
+Si tu veux que cliquer une checkbox fasse une action (extraction par exemple), utilise :
+
+```ts
+const selectedNodes = gridOptions.api.getSelectedNodes();
+const selectedData = selectedNodes.map(node => node.data);
+```
+
+---
+
+Si tu veux, je peux aussi te faire la version avec un `@Output()` pour déclencher une action directement depuis le renderer.
+
+Souhaites-tu cela aussi ?
