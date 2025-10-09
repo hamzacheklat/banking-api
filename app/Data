@@ -1,0 +1,151 @@
+✅ Parfait — là tu touches le bon point.
+
+Tu as raison :
+👉 **`agCheckboxCellRenderer` ne suffit pas** dans ton cas,
+car **ta colonne affiche déjà d’autres informations** (par ex. statut, texte, icônes, etc.).
+
+Autrement dit :
+
+* Si tu remplaces ton renderer custom par `agCheckboxCellRenderer`, tu perds tout ton affichage spécifique.
+* Mais tu veux **garder ton `StatusRendererComponent`**, et **y ajouter une checkbox “simple”** à côté de ton contenu.
+
+---
+
+## 🎯 Solution idéale pour ton cas
+
+➡️ **Tu gardes ton `cellRenderer` Angular custom** (ton `StatusRendererComponent`)
+➡️ Tu **ajoutes le `<input type="checkbox">` directement dans le template**, et tu gères son état dans le `params.data`.
+
+C’est ce qu’utilisent les projets pros AG Grid :
+un seul composant Angular par colonne, avec des checkboxes, icônes, statuts, etc.
+
+---
+
+### 🔹 Exemple clair
+
+#### 🧩 1. `status-renderer.component.html`
+
+```html
+<div class="status-cell" style="display: flex; align-items: center; gap: 8px;">
+  <!-- ✅ Checkbox liée à la donnée -->
+  <input
+    type="checkbox"
+    [checked]="isExtract ? params.data.extract_selected : params.data.replicat_selected"
+    (change)="onCheckboxChange($event)"
+  />
+
+  <!-- 🔹 Autre contenu (statut, texte, icône, etc.) -->
+  <div class="status-info">
+    <span [ngClass]="{
+      running: dataStatus === 'RUNNING',
+      stopped: dataStatus === 'STOPPED',
+      abended: dataStatus === 'ABENDED'
+    }">
+      {{ dataStatus }}
+    </span>
+  </div>
+</div>
+```
+
+---
+
+#### ⚙️ 2. `status-renderer.component.ts`
+
+```ts
+import { Component } from '@angular/core';
+import { ICellRendererAngularComp } from 'ag-grid-angular';
+
+@Component({
+  selector: 'app-status-renderer',
+  templateUrl: './status-renderer.component.html',
+})
+export class StatusRendererComponent implements ICellRendererAngularComp {
+  params: any;
+  dataStatus: string = '';
+  isExtract = false;
+
+  agInit(params: any): void {
+    this.params = params;
+    this.dataStatus = params.data.status; // ou ton champ
+    this.isExtract = params.colDef.field === 'extract'; // détermine la colonne
+  }
+
+  refresh(): boolean {
+    return false;
+  }
+
+  onCheckboxChange(event: Event) {
+    const checked = (event.target as HTMLInputElement).checked;
+
+    if (this.isExtract) {
+      this.params.data.extract_selected = checked;
+    } else {
+      this.params.data.replicat_selected = checked;
+    }
+
+    // ✅ Notifie AG Grid (optionnel)
+    this.params.api.dispatchEvent({
+      type: this.isExtract ? 'extractCheckboxChanged' : 'replicatCheckboxChanged',
+      data: this.params.data,
+      checked,
+    });
+  }
+}
+```
+
+---
+
+#### 🧱 3. Dans ton `columnDefs`
+
+```ts
+columnDefs = [
+  { headerName: 'Name', field: 'name' },
+  {
+    headerName: 'Extract',
+    field: 'extract',
+    cellRenderer: 'statusRenderer',
+  },
+  {
+    headerName: 'Replicat',
+    field: 'replicat',
+    cellRenderer: 'statusRenderer',
+  },
+];
+```
+
+Et dans ton `gridOptions` :
+
+```ts
+frameworkComponents = {
+  statusRenderer: StatusRendererComponent,
+};
+```
+
+---
+
+### ✅ Résultat
+
+| Name     | Extract    | Replicat   |
+| -------- | ---------- | ---------- |
+| Server 1 | ☑️ Running | ☐ Abended  |
+| Server 2 | ☐ Stopped  | ☑️ Running |
+
+✔️ Tu gardes ton **affichage custom (statut, couleurs, icônes, etc.)**
+✔️ Chaque colonne a **sa propre checkbox indépendante**
+✔️ Les valeurs se stockent dans `rowData` (`extract_selected`, `replicat_selected`)
+✔️ Tu peux écouter les changements via les événements AG Grid (`extractCheckboxChanged`, etc.)
+
+---
+
+💡 En résumé
+
+| Option                                               | Simplicité     | Flexibilité      | Recommandée pour toi ? |
+| ---------------------------------------------------- | -------------- | ---------------- | ---------------------- |
+| `agCheckboxCellRenderer` seul                        | 🟢 Très simple | 🔴 Peu flexible  | ❌ Non                  |
+| Ton `StatusRendererComponent` avec checkbox intégrée | 🟠 Moyen       | 🟢 Très flexible | ✅ Oui                  |
+| Deux renderers séparés                               | 🔴 Complexe    | 🟡 Moyen         | ❌ Non utile            |
+
+---
+
+Souhaites-tu que je t’envoie la **version finale complète** de ton `StatusRendererComponent` (TypeScript + HTML) avec la checkbox intégrée de cette façon,
+prête à copier dans ton projet Angular ?
