@@ -1,0 +1,40 @@
+public onRowSelected(event): void {
+  const colId = (event.node as any).colId;
+  const checked = (event.node as any).checked;
+  const column = this.columnApi.getColumn(colId);
+  if (!column) { return; }
+
+  const def = column.getColDef();
+
+  // si la colonne est un champ de grouping, il faut cibler l'auto-group column
+  const isGroupField = !!def?.rowGroup || !!def?.showRowGroup;
+  if (isGroupField) {
+    // essai direct par id (valeur par défaut) puis fallback en recherchant le renderer de groupe
+    let autoCol = this.columnApi.getColumn('ag-Grid-AutoColumn');
+    if (!autoCol) {
+      autoCol = this.columnApi.getAllGridColumns()
+        .find(c => {
+          const cd = c.getColDef();
+          return cd && (cd.cellRenderer === 'agGroupCellRenderer' || cd.cellRendererFramework === 'agGroupCellRenderer');
+        });
+    }
+
+    if (autoCol) {
+      const autoDef = autoCol.getColDef();
+      autoDef.cellRendererParams = {
+        ...(autoDef.cellRendererParams || {}),
+        disableCheckbox: checked  // ou le flag que tu veux transmettre
+      };
+      // re-render l'auto-group column
+      this.gridApi.refreshCells({ force: true, columns: [autoCol.getColId()] });
+    }
+  } else {
+    // cas normal : colonne "ordinaire"
+    const params = { ...(def.cellRendererParams || {}) };
+    params.disableCheckbox = checked ? true : false;
+    def.cellRendererParams = params;
+    this.gridApi.refreshCells({ force: true, columns: [colId] });
+  }
+
+  // ... le reste de ton traitement (gestion des boutons) ...
+}
