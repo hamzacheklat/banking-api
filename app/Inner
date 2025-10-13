@@ -1,0 +1,32 @@
+const colId = (event.node as any).colId;
+if (colId) {
+  const checked = (event.node as any).checked;
+  const column = this.columnApi.getColumn(colId);
+  const def = column.getColDef();
+
+  console.log(def);
+
+  let params: any;
+
+  // 🧩 Vérifie si c'est une colonne de groupe
+  if (def.cellRenderer === 'agGroupCellRenderer') {
+    // Si c'est un group cell renderer, la propriété est plus profonde
+    params = { ...(def.cellRendererParams || {}) };
+
+    if (params.innerRendererParams) {
+      params.innerRendererParams.disableCheckbox = checked ? true : false;
+    } else {
+      params.innerRendererParams = { disableCheckbox: checked ? true : false };
+    }
+
+    def.cellRendererParams = params;
+  } else {
+    // Cas normal
+    params = { ...(def.cellRendererParams || {}) };
+    params.disableCheckbox = checked ? true : false;
+    def.cellRendererParams = params;
+  }
+
+  // Rafraîchit la colonne
+  this.gridApi.refreshCells({ force: true, columns: [colId] });
+}
