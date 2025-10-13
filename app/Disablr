@@ -1,0 +1,23 @@
+updateDisableCheckbox(colId: string, checked: boolean) {
+  if (!this.gridApi) { console.error('gridApi not ready'); return; }
+
+  const colDefs = this.gridApi.getColumnDefs() as any[]; // ColDef[]
+  const def = colDefs.find(c => c.colId === colId || c.field === colId);
+  if (!def) { console.error('colDef introuvable', colId); return; }
+
+  def.cellRendererParams = {
+    ...(def.cellRendererParams || {}),
+    disableCheckbox: checked
+  };
+
+  // préserver l'état des colonnes (taille/ordre/visibilité)
+  const colState = this.columnApi.getColumnState();
+  const sortModel = this.gridApi.getSortModel();
+
+  // setColumnDefs — TypeScript peut requérir un cast
+  (this.gridApi as any).setColumnDefs(colDefs);
+
+  // ré-appliquer l'état
+  this.columnApi.applyColumnState({ state: colState, applyOrder: true });
+  this.gridApi.setSortModel(sortModel);
+}
