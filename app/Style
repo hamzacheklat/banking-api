@@ -1,0 +1,18 @@
+.styles: [`
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #007bff; /* couleur bleue moderne */
+    border-radius: 4px;
+  }
+
+  input[type="checkbox"]:hover {
+    filter: brightness(1.1);
+  }
+
+  input[type="checkbox"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`]
