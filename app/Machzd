@@ -1,0 +1,20 @@
+onActionReceived(result: { action: string, data: any[] }) {
+  const selectedNodes = this.gridApi.getSelectedNodes();
+
+  selectedNodes.forEach(node => {
+    const nodeData = node.data;
+
+    // Recherche de l'objet correspondant dans result.data
+    const matched = result.data.find(item =>
+      item.pxname === nodeData.pxname &&
+      item.deployment === nodeData.deployment
+    );
+
+    if (matched) {
+      node.setDataValue('status', result.action === 'start' ? 'En cours' : 'Arrêté');
+      node.setDataValue('message', matched.message || '');
+      // Mets à jour d'autres champs si besoin :
+      // node.setDataValue('lastUpdated', matched.lastUpdated || new Date());
+    }
+  });
+}
