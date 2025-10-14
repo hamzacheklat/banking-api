@@ -1,0 +1,99 @@
+@Component({
+  selector: 'app-status-cell',
+  template: `
+    <div class="status-cell">
+      <input
+        *ngIf="checkboxSelection"
+        type="checkbox"
+        class="styled-checkbox"
+        [checked]="params.data ? params.data[params.columnChecked] : params.node.allLeafChildren[0].data[params.columnChecked]"
+        [disabled]="disableCheckbox"
+        (change)="onCheckboxChange($event)"
+      />
+
+      <ng-container *ngIf="isGrouping; else notGrouping">
+        {{ name }}
+      </ng-container>
+
+      <ng-template #notGrouping>
+        <span *ngIf="isExtract">{{ value }}</span>
+        <div *ngIf="datStatus" class="status">
+          <i class="fa fa-circle" [ngClass]="{
+              'running': datStatus === 'RUNNING',
+              'stopped': datStatus === 'STOPPED',
+              'abended': datStatus === 'ABENDED' || datStatus === 'KILLED'
+            }"></i>
+          <span class="status-text">{{ datStatus }}</span>
+        </div>
+      </ng-template>
+    </div>
+  `,
+  styles: [`
+    .status-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ---- CHECKBOX STYLE ---- */
+    .styled-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      background-color: #fff;
+      border: 2px solid #ccc;
+      border-radius: 6px;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .styled-checkbox:hover {
+      border-color: #007bff;
+    }
+
+    .styled-checkbox:checked {
+      background-color: #007bff;
+      border-color: #007bff;
+    }
+
+    .styled-checkbox:checked::after {
+      content: '✔';
+      position: absolute;
+      color: white;
+      font-size: 12px;
+      left: 3px;
+      top: -1px;
+    }
+
+    .styled-checkbox:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* ---- STATUS STYLE ---- */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-text {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .running {
+      color: #60AD25;
+    }
+
+    .stopped {
+      color: #E97523;
+    }
+
+    .abended {
+      color: #CC333D;
+    }
+  `]
+})
