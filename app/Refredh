@@ -1,0 +1,49 @@
+public putAction(
+  action: string,
+  data: any[],
+  force: boolean,
+  startOptions: any
+): Observable<any> {
+  const actionData: Observable<any>[] = [];
+
+  data.forEach((requestData) => {
+    let deployment = requestData.deployment
+      ? requestData.deployment
+      : requestData.target_deployment;
+
+    const pxtype = PxType[requestData.pxtype];
+    const pxname = requestData.pxname;
+    let region: string;
+
+    if (requestData.region) {
+      region = requestData.region;
+    } else if (requestData.target_ogg_host.startsWith('eur')) {
+      region = 'EMEA';
+    } else if (requestData.target_ogg_host.startsWith('sin')) {
+      region = 'APAC';
+    } else if (requestData.target_ogg_host.startsWith('nar')) {
+      region = 'AMER';
+    }
+
+    actionData.push(
+      this.putActionOnProcess(action, pxtype, region, deployment, pxname, force, startOptions)
+        .pipe(catchError((err) => of(err))) // éviter que forkJoin casse en cas d’erreur
+    );
+  });
+
+  // 👉 après exécution de toutes les requêtes, on appelle getFlows()
+  return forkJoin(actionData).pipe(
+    switchMap((responses) => {
+      // tu peux faire un check si besoin ici, par exemple :
+      const allOk = responses.every((res) => res && res.status === 200);
+      if (allOk) {
+        return this.getFlows(); // recharge les données
+      }
+      return of(responses); // sinon, on renvoie quand même la réponse
+    }),
+    catchError((error) => {
+      console.error('Error in putAction:', error);
+      return of(error);
+    })
+  );
+}
