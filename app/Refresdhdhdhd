@@ -1,0 +1,8 @@
+onActionReceived(result: { action: string, data: any[] }) {
+  const selectedNodes = this.gridApi.getSelectedNodes();
+
+  selectedNodes.forEach((node, index) => {
+    node.setDataValue('status', result.action === 'start' ? 'En cours' : 'Arrêté');
+    node.setDataValue('message', result.data[index]?.message || '');
+  });
+}
