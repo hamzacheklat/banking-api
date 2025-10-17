@@ -1,0 +1,12 @@
+| Cas | `ecosystem` input      | `status` | `all.status` avant | `specific.eco` avant  | Résultat attendu (ligne all) | Résultat attendu (ligne spécifique)           | Notes                                   |
+| --- | ---------------------- | -------- | ------------------ | --------------------- | ---------------------------- | --------------------------------------------- | --------------------------------------- |
+| 1   | all                    | close    | open               | "database"            | status = close               | status = close, ecosystem = ""                | Fermeture globale                       |
+| 2   | all                    | open     | close              | "oracle"              | status = open                | status = open, ecosystem = ""                 | Ouverture globale                       |
+| 3   | database               | close    | open               | ""                    | status = open (inchangé)     | status = close, ecosystem = "database"        | Fermeture spécifique                    |
+| 4   | oracle                 | close    | close              | ""                    | status = close (inchangé)    | status = close, ecosystem = "" (inchangé)     | Fermeture globale déjà en place         |
+| 5   | database,oracle        | close    | open               | "oracle"              | status = open (inchangé)     | status = close, ecosystem = "database,oracle" | Ajout multiple sans doublons            |
+| 6   | database,oracle,oracle | close    | open               | "oracle"              | status = open (inchangé)     | status = close, ecosystem = "database,oracle" | Doublons éliminés                       |
+| 7   | database               | open     | close              | "oracle"              | status = close (inchangé)    | status = open, ecosystem = "oracle,database"  | Ouverture spécifique quand global fermé |
+| 8   | oracle                 | open     | open               | "database,oracle"     | status = open (inchangé)     | status = close, ecosystem = "database"        | Ouverture partielle                     |
+| 9   | oracle,postgres        | open     | open               | "oracle,postgres,dbx" | status = open (inchangé)     | status = close, ecosystem = "dbx"             | Ouverture multiple                      |
+| 10  | database               | open     | open               | ""                    | status = open (inchangé)     | status = open, ecosystem = ""                 | Rien à faire, déjà ouvert               |
