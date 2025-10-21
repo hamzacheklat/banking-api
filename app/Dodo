@@ -1,0 +1,6 @@
+pip install --upgrade langchain==1.0.1 langchain-community
+# (1) active ton venv (si tu en as un)
+# ex: source .venv/bin/activate   ou   .venv\Scripts\activate (Windows)
+
+# (2) installer une version 0.x récente (garantit que chains existe)
+pip install --upgrade "langchain<1.0.0,>=0.1.17" langchain-community
