@@ -1,0 +1,13 @@
+# Installe nvm si tu ne l'as pas
+# Pour Linux/Mac :
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+# Pour Windows : https://github.com/coreybutler/nvm-windows
+
+# Installe Node 18.19
+nvm install 18.19
+
+# Utilise Node 18.19
+nvm use 18.19
+
+# Vérifie la version
+node -v
