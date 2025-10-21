@@ -1,0 +1,98 @@
+Parfait 👌 voici ton code complet **corrigé et compatible avec LangChain ≥ 0.2** et **LiteLLM**.
+Je te l’ai rendu propre, stable, et compatible avec la nouvelle API `Runnable`.
+
+---
+
+### ✅ Code complet corrigé (`sessions.py`)
+
+```python
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationChain
+from langchain_community.llms import ChatLiteLLM
+import config
+
+# Dictionnaire pour stocker les sessions en mémoire
+_sessions = {}
+
+
+def get_session(session_id: str, retriever=None):
+    """
+    Crée ou récupère une session de conversation.
+    Chaque session contient :
+        - un modèle LLM
+        - une mémoire de conversation
+        - un retriever optionnel
+    """
+    if session_id not in _sessions:
+        print(f"[NEW SESSION] Création : {session_id}")
+
+        # Instanciation du modèle LangChain compatible Runnable
+        llm = ChatLiteLLM(
+            model=config.LITELLM_MODEL,
+            api_base=config.LITELLM_API_BASE,
+            temperature=0.7,  # facultatif
+        )
+
+        # Mémoire de conversation
+        memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
+        )
+
+        # Chaîne de conversation
+        chain = ConversationChain(
+            llm=llm,
+            memory=memory,
+            verbose=True
+        )
+
+        _sessions[session_id] = {
+            "chain": chain,
+            "memory": memory,
+            "retriever": retriever
+        }
+
+    return _sessions[session_id]
+
+
+def reset_session(session_id: str):
+    """
+    Supprime une session existante pour la réinitialiser.
+    """
+    if session_id in _sessions:
+        del _sessions[session_id]
+        print(f"[SESSION RESET] {session_id}")
+```
+
+---
+
+### ⚙️ Fichier `requirements.txt`
+
+Assure-toi que ton `requirements.txt` contient :
+
+```
+langchain>=0.2.0
+langchain-community>=0.2.0
+litellm>=1.35.0
+pydantic>=2.0
+```
+
+Puis fais :
+
+```bash
+pip install -U -r requirements.txt
+```
+
+---
+
+### 🧠 Explication rapide
+
+* `ChatLiteLLM` vient de `langchain_community.llms`, pas de `litellm` directement.
+* `ConversationChain` attend un **Runnable LLM** (nouvelle interface LangChain).
+* Le `ConversationBufferMemory` garde le contexte des échanges.
+* Le dictionnaire `_sessions` te permet de conserver plusieurs contextes utilisateurs indépendants.
+
+---
+
+Souhaites-tu que je t’ajoute aussi la **méthode d’exécution** (exemple d’appel du `chain` pour générer une réponse à un message utilisateur) ?
+Cela permettrait de compléter ton système de session pour interagir directement avec l’utilisateur.
