@@ -1,0 +1,120 @@
+# conversational_rag_v1.py
+import os
+
+# embeddings/vectorstore helpers (semblable à ton code)
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import Chroma, FAISS
+
+# --- nouveau style v1 ---
+from langchain.chains import create_retrieval_chain, create_history_aware_retriever
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import PromptTemplate
+
+# ton LLM wrapper (LiteLLM dans ton code)
+from litellm import LiteLLM
+
+# sessions/get_session existants dans ton projet
+from sessions import get_session
+import config
+
+def load_vectorstore():
+    embeddings = SentenceTransformerEmbeddings(model_name=config.EMBED_MODEL)
+    if config.VECTOR_DB_TYPE.lower() == "chroma":
+        return Chroma(
+            persist_directory=config.VECTOR_DB_PATH,
+            embedding_function=embeddings,
+        )
+    elif config.VECTOR_DB_TYPE.lower() == "faiss":
+        return FAISS.load_local(config.VECTOR_DB_PATH, embeddings, allow_dangerous_deserialization=True)
+    else:
+        raise ValueError("VECTOR_DB_TYPE doit être 'chroma' ou 'faiss'")
+
+def get_llm():
+    os.environ["MISTRAL_API_KEY"] = config.LITELLM_API_KEY
+    os.environ["NO_PROXY"] = "*"
+    return LiteLLM(
+        model=config.LITELLM_MODEL,
+        api_base=config.LITELLM_API_BASE,
+    )
+
+def get_rag_session(session_id: str):
+    db = load_vectorstore()
+    # on garde ton paramètre k=5
+    retriever = db.as_retriever(search_kwargs={"k": 5})
+    return get_session(session_id, retriever)
+
+# helper: convert memory (ConversationBufferMemory / chat_memory) en chat_history attendu
+def memory_to_chat_history(memory_obj):
+    """
+    Retourne une liste de messages [{ 'role': 'user'|'assistant', 'content': '...' }, ...]
+    Adapte selon ton type de memory ; ici on suppose memory_obj.chat_memory.messages est présent.
+    """
+    if not memory_obj:
+        return []
+    # try to get chat_memory.messages
+    msgs = []
+    try:
+        for m in memory_obj.chat_memory.messages:
+            role = "user" if getattr(m, "type", "") == "human" else "assistant"
+            msgs.append({"role": role, "content": m.content})
+    except Exception:
+        # fallback : memory_obj peut déjà être une liste
+        try:
+            for m in memory_obj:
+                msgs.append(m)
+        except Exception:
+            return []
+    return msgs
+
+def ask_question(session_id: str, query: str):
+    # récupère session contenant 'retriever' et 'memory' (comme dans ton code)
+    session = get_rag_session(session_id)
+    llm = get_llm()
+
+    # ton prompt (je garde ton template FR)
+    prompt = PromptTemplate(
+        input_variables=["context", "question"],
+        template=(
+            "Tu es un assistant BNP qui répond sur le wiki IV2.\n"
+            "Utilise uniquement le contexte ci-dessous pour formuler ta réponse.\n\n"
+            "Contexte:\n{context}\n\nQuestion: {question}\n\nRéponse:"
+        ),
+    )
+
+    # créer la partie combine docs -> réponse (équivalent de combine_docs_chain_kwargs dans l'ancien code)
+    combine_docs_chain = create_stuff_documents_chain(llm=llm, prompt=prompt)
+
+    # créer un retriever "history-aware" : il s'occupe d'inclure l'historique lors de la reformulation de la question
+    history_aware_retriever = create_history_aware_retriever(
+        retriever=session["retriever"],
+        memory_key="chat_history",   # clé attendue par le callable
+        question_key="question",     # clé du payload contenant la question
+    )
+
+    # composer la chaîne finale
+    chain = create_retrieval_chain(
+        history_aware_retriever,
+        combine_docs_chain,
+    )
+
+    # construire la chat_history à partir de la mémoire (ou une liste vide)
+    chat_history = memory_to_chat_history(session.get("memory"))
+
+    # invocation : on fournit la question et l'historique
+    inputs = {
+        "question": query,
+        "chat_history": chat_history,
+    }
+
+    result = chain.invoke(inputs)
+
+    # `result` contient généralement un champ 'result' ou 'output'; adapte selon ce que renvoie ton LLM
+    answer = result.get("result") or result.get("output") or result.get("answer") or ""
+    
+    # retourne une structure proche de ton ancien code
+    return {
+        "session_id": session_id,
+        "answer": answer,
+        "raw": result,
+        "history": chat_history,
+    }
