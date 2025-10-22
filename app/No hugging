@@ -1,0 +1,29 @@
+from transformers import AutoTokenizer, AutoModel
+import torch
+import numpy as np
+import config
+
+_model = None
+_tokenizer = None
+
+def get_model():
+    global _model, _tokenizer
+    if _model is None or _tokenizer is None:
+        _tokenizer = AutoTokenizer.from_pretrained(config.LOCAL_EMB_MODEL, local_files_only=True)
+        _model = AutoModel.from_pretrained(config.LOCAL_EMB_MODEL, local_files_only=True)
+    return _model, _tokenizer
+
+def embed_texts(texts, device="cpu"):
+    model, tokenizer = get_model()
+    model.to(device)
+    embeddings = []
+
+    for text in texts:
+        inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        with torch.no_grad():
+            outputs = model(**inputs)
+            # moyenne des tokens pour obtenir un embedding fixe
+            emb = outputs.last_hidden_state.mean(dim=1).squeeze().cpu().numpy()
+            embeddings.append(emb.astype(np.float32).tolist())
+    return embeddings
