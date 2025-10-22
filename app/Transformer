@@ -1,0 +1,113 @@
+Très bonne remarque 👏
+Tu as raison : même si mon code précédent n’appelle **aucune API externe**, la librairie `transformers` essaie **par défaut de télécharger les poids sur Hugging Face** si le modèle n’est pas présent localement.
+Or dans ton environnement **BNP**, tu n’as souvent **ni accès Internet**, ni possibilité d’utiliser Hugging Face Hub.
+
+👉 Du coup, il faut **supprimer toute dépendance à Hugging Face** et avoir un embedder **100 % offline**, sans besoin d’un modèle pré-entraîné téléchargé.
+
+---
+
+# ✅ Solution simple et robuste (zéro Hugging Face)
+
+On va utiliser un **encodeur TF-IDF local** pour créer les embeddings :
+
+* rapide,
+* totalement offline,
+* suffisant pour un RAG interne sur Confluence,
+* compatible avec Chroma.
+
+---
+
+## 🧠 Nouveau `app/embedder.py` (offline complet)
+
+```python
+# app/embedder.py
+import os
+import pickle
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+import config
+
+MODEL_PATH = os.path.join(config.CHROMA_DB_DIR, "tfidf_vectorizer.pkl")
+
+_vectorizer = None
+
+def get_vectorizer():
+    """Charge ou entraîne un TF-IDF local pour produire des embeddings."""
+    global _vectorizer
+    if _vectorizer is not None:
+        return _vectorizer
+
+    if os.path.exists(MODEL_PATH):
+        with open(MODEL_PATH, "rb") as f:
+            _vectorizer = pickle.load(f)
+    else:
+        # Initialisation vide — sera entraîné à l'ingestion
+        _vectorizer = TfidfVectorizer(max_features=4096)
+    return _vectorizer
+
+
+def train_vectorizer(texts):
+    """Entraîne le TF-IDF sur le corpus Confluence et le sauvegarde localement."""
+    global _vectorizer
+    _vectorizer = TfidfVectorizer(max_features=4096)
+    _vectorizer.fit(texts)
+    os.makedirs(config.CHROMA_DB_DIR, exist_ok=True)
+    with open(MODEL_PATH, "wb") as f:
+        pickle.dump(_vectorizer, f)
+    return _vectorizer
+
+
+def embed_texts(texts):
+    """Renvoie des embeddings numpy (listes float32)."""
+    vec = get_vectorizer()
+    # Si le vecteur n’a pas été entraîné, on l’entraîne sur ces textes
+    if not hasattr(vec, "vocabulary_") or len(vec.vocabulary_) == 0:
+        vec = train_vectorizer(texts)
+    X = vec.transform(texts)
+    return [x.toarray().flatten().astype(np.float32).tolist() for x in X]
+
+
+def embed_text(text):
+    return embed_texts([text])[0]
+```
+
+---
+
+## ⚙️ Et maintenant ?
+
+* Ce système TF-IDF fonctionne **entièrement localement**.
+* Lors de la **première ingestion Confluence**, le vecteur sera entraîné (`train_vectorizer()`), puis sauvegardé dans `chroma_db/tfidf_vectorizer.pkl`.
+* Lors des requêtes suivantes, les embeddings seront créés avec le même modèle, assurant une cohérence entre ingestion et recherche.
+
+---
+
+## ✅ Avantages
+
+* 🚫 Aucun appel vers Hugging Face ou API externe.
+* 🧠 Apprentissage local sur ton propre corpus Confluence.
+* 💾 Sauvegarde persistante.
+* 🧩 Compatible avec Chroma (`float32` embeddings).
+* 💡 Facilement remplaçable plus tard par un vrai modèle sémantique si ton infra s’ouvre.
+
+---
+
+## 🚀 Mise à jour rapide
+
+1. Supprime `sentence-transformers` et `transformers` de ton `requirements.txt`.
+2. Ajoute :
+
+   ```txt
+   scikit-learn
+   numpy
+   ```
+3. Redémarre ton backend :
+
+   ```bash
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload
+   ```
+4. Relance `/ingest_confluence` → la première ingestion entraînera le TF-IDF automatiquement.
+
+---
+
+Souhaites-tu que je t’ajoute une **option `--retrain-vectorizer`** dans la commande d’ingestion (pour pouvoir le réentraîner manuellement quand tu veux) ?
