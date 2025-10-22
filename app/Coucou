@@ -1,0 +1,117 @@
+Parfait — tu obtiens ces erreurs parce que `SentenceTransformer(...)` essaie de télécharger le modèle depuis Hugging Face et ta machine (ou le réseau) bloque/limite l'accès. Voici plusieurs méthodes simples pour **récupérer le modèle en local** (choisis celle qui te convient). Après téléchargement tu pourras charger le modèle localement avec `SentenceTransformer("/chemin/vers/le/modèle")`.
+
+---
+
+# 1) **Méthode recommandée : `git lfs` (simple et propre)**
+
+Beaucoup de modèles HF utilisent Git LFS pour les gros fichiers (`pytorch_model.bin` / `model.safetensors`).
+
+```bash
+# installer git-lfs (Debian/Ubuntu)
+sudo apt update
+sudo apt install git-lfs
+git lfs install
+
+# se logger si nécessaire (optionnel, utile si repo privé)
+pip install huggingface_hub
+huggingface-cli login   # colle ton token
+
+# cloner le repo du modèle
+git clone https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+# ou si tu t'es déjà loggé avec huggingface-cli, la commande ci-dessus fonctionnera pour télécharger les gros fichiers LFS.
+```
+
+Le dossier `all-MiniLM-L6-v2` contiendra `config.json`, `pytorch_model.bin` ou `model.safetensors`, `tokenizer.json`, etc.
+
+---
+
+# 2) **Avec la librairie `huggingface_hub` (script Python)**
+
+Pratique si tu préfères un script pour télécharger dans un dossier précis.
+
+```bash
+pip install huggingface_hub
+```
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+    repo_id="sentence-transformers/all-MiniLM-L6-v2",
+    cache_dir="./models/all-MiniLM-L6-v2",   # ou tout autre chemin
+    repo_type="model"
+)
+```
+
+Si nécessaire, exporte ton token avant :
+
+```bash
+export HUGGINGFACE_HUB_TOKEN="hf_xxx..."
+```
+
+---
+
+# 3) **Avec `wget` (méthode manuelle)**
+
+Possible mais fastidieux : il faut récupérer chaque fichier (config, modèle, tokenizer). Utile si tu veux absolument `wget` :
+
+1. Récupère la liste des fichiers (via l'interface web) ou construis les URLs `resolve/main/<filename>`.
+2. Télécharge en passant le token dans l'en-tête :
+
+```bash
+export HF_TOKEN="hf_xxx..."
+
+wget --header="Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/config.json" -O ./model/config.json
+
+wget --header="Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/pytorch_model.bin" -O ./model/pytorch_model.bin
+
+# répète pour tokenizer.json, tokenizer_config.json, vocab.txt si présents...
+```
+
+> Remarque : certains gros fichiers sont stockés via LFS ; `wget` direct peut échouer si le repo utilise LFS — privilégie `git lfs` ou `snapshot_download`.
+
+---
+
+# 4) **Via Docker (si ton réseau bloque depuis l'hôte)**
+
+Tu peux lancer un conteneur qui télécharge le modèle et le copie sur ton hôte via un volume monté.
+
+Exemple minimal :
+
+```bash
+docker run --rm -it -v $(pwd)/models:/models python:3.11-bullseye /bin/bash
+# dans le container :
+pip install huggingface_hub
+export HUGGINGFACE_HUB_TOKEN="hf_xxx..."
+python -c "from huggingface_hub import snapshot_download; snapshot_download('sentence-transformers/all-MiniLM-L6-v2', cache_dir='/models/all-MiniLM-L6-v2')"
+# ensuite le modèle sera dans ./models/all-MiniLM-L6-v2 sur ton hôte
+```
+
+Tu peux aussi utiliser une image de ML (p. ex. `pytorch` / `transformers`) si tu veux tester le modèle immédiatement dans le container.
+
+---
+
+# Charger le modèle localement dans ton code
+
+Une fois le dossier présent localement :
+
+```python
+from sentence_transformers import SentenceTransformer
+model = SentenceTransformer("/chemin/vers/all-MiniLM-L6-v2")
+```
+
+---
+
+# Causes possibles des erreurs `Max retries exceeded`
+
+* Pas de connexion sortante vers `huggingface.co` (pare-feu d’entreprise). -> *Utilise Docker si l’hôte est bloqué ou télécharge via une machine avec accès puis copie le dossier.*
+* Modèle privé / token manquant -> *utilise `huggingface-cli login` ou `HUGGINGFACE_HUB_TOKEN`.*
+* Git LFS non installé -> *les fichiers modèles n’ont pas été récupérés.*
+
+Si tu veux, dis-moi :
+
+* quel modèle exact tu veux (ex : `sentence-transformers/all-MiniLM-L6-v2` ?),
+* si tu es sur un réseau d’entreprise (proxy/pare-feu),
+  et je te donne la commande exacte adaptée (ex : clonage `git lfs` ou script `snapshot_download` prêt à coller).
