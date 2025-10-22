@@ -1,0 +1,112 @@
+Parfait 👍
+Tu veux donc que ton **RAG** n’utilise **aucun modèle hébergé sur Hugging Face**, et reste **100 % local**, sans dépendre de `huggingface.co`.
+
+👉 Je te propose d’utiliser **LaBSE** (Language-agnostic BERT Sentence Embedding), développé par **Google**, téléchargeable via **TensorFlow Hub** (pas Hugging Face).
+C’est un excellent modèle pour produire des embeddings multilingues (français inclus 🇫🇷), et il fonctionne entièrement **offline** une fois téléchargé.
+
+---
+
+## ⚙️ Étapes à suivre
+
+### 1️⃣ Installe les dépendances requises
+
+Ajoute-les à ton `requirements.txt` :
+
+```txt
+tensorflow
+tensorflow-hub
+```
+
+*(tu peux retirer `sentence-transformers` si tu ne l’utilises plus)*
+
+---
+
+### 2️⃣ Mets à jour ton fichier `.env`
+
+```env
+LOCAL_EMB_MODEL=https://tfhub.dev/google/LaBSE/2
+```
+
+⚠️ Tu peux aussi **télécharger le modèle localement une seule fois** puis l’utiliser en local (voir plus bas 👇).
+
+---
+
+### 3️⃣ Nouveau fichier `app/embedder.py` (avec LaBSE – sans Hugging Face)
+
+```python
+import tensorflow_hub as hub
+import tensorflow as tf
+import numpy as np
+import config
+import os
+
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        print("🔹 Loading LaBSE model (can take a minute)...")
+        # Si le modèle est local (ex: ./models/LaBSE)
+        if os.path.exists(config.LOCAL_EMB_MODEL):
+            _model = hub.load(config.LOCAL_EMB_MODEL)
+        else:
+            _model = hub.load("https://tfhub.dev/google/LaBSE/2")
+    return _model
+
+def embed_texts(texts):
+    model = get_model()
+    # Normalisation
+    def preprocess(sentences):
+        return [tf.constant([t]) for t in sentences]
+    embeddings = []
+    for batch in preprocess(texts):
+        emb = model(batch)["default"]
+        embeddings.append(np.array(emb[0], dtype=np.float32).tolist())
+    return embeddings
+```
+
+✅ Ce code :
+
+* Utilise **TensorFlow Hub**, pas Hugging Face.
+* Télécharge une fois le modèle si tu ne l’as pas déjà localement.
+* Produit des embeddings compatibles avec Chroma (vecteurs `float32`).
+
+---
+
+### 4️⃣ (Optionnel) Téléchargement local une seule fois
+
+Tu peux télécharger le modèle une fois (avec Internet) puis le copier sur ton serveur offline :
+
+```python
+import tensorflow_hub as hub
+model = hub.load("https://tfhub.dev/google/LaBSE/2")
+model.save("./models/LaBSE")
+```
+
+Ensuite, dans ton `.env` :
+
+```env
+LOCAL_EMB_MODEL=./models/LaBSE
+```
+
+Et le backend chargera le modèle localement sans aucun accès externe 🔒
+
+---
+
+### ✅ Résumé
+
+* **Avantages :**
+
+  * Pas de Hugging Face
+  * Compatible avec TensorFlow / CPU
+  * Multilingue (fr, en, etc.)
+  * Facilement intégrable à ton code existant
+
+* **Inconvénient :**
+
+  * Un peu plus lourd (~1.2 Go)
+  * L’inférence est un peu plus lente que MiniLM (car modèle complet BERT)
+
+---
+
+Souhaites-tu que je te montre **comment adapter `requirements.txt` et `Dockerfile`** pour que tout soit prêt à tourner avec LaBSE (offline) ?
