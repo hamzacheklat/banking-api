@@ -3,7 +3,7 @@ Voici une **version complète et cohérente** de ton projet **RAG (Confluence + 
 Tu auras **tous les fichiers backend et frontend** prêts à copier dans ton repo.
 
 > ⚙️ **Objectif** : RAG interne, ingestion Confluence, embeddings locaux, stockage Chroma, génération via `litellm`, interface Angular 16 minimaliste.
-
+https://www.kaggle.com/datasets/shinomoriaoshi/sentence-transformersall-minilm-l12-v2?utm_source=chatgpt.com
 ---
 
 # 🧱 ARBORESCENCE GLOBALE
