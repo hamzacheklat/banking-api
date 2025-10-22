@@ -1,0 +1,116 @@
+Parfait 👌 tu veux donc **télécharger le modèle Hugging Face** pour l’utiliser **localement** sans passer par leur API (et éviter la 403).
+
+Voici **la bonne méthode complète** (sans dépendre du endpoint `api-inference.huggingface.co`).
+
+---
+
+## 🧠 Contexte
+
+Le `curl` que tu cites appelle **l’API d’inférence distante** de Hugging Face (c’est-à-dire que le calcul est fait sur leurs serveurs).
+→ Ce n’est **pas utile** si ton but est de **télécharger le modèle** et de l’utiliser **localement avec `sentence-transformers`**.
+
+Pour un PoC (et pour éviter la 403), le mieux est de **télécharger une fois le modèle** sur ton disque, puis le charger directement.
+
+---
+
+## 🚀 Méthode 1 — Télécharger automatiquement avec `sentence-transformers`
+
+Tu peux simplement exécuter ce script :
+
+```python
+from sentence_transformers import SentenceTransformer
+
+# Téléchargement automatique du modèle depuis Hugging Face
+model_name = "sentence-transformers/all-MiniLM-L6-v2"
+model = SentenceTransformer(model_name)
+
+# Test simple
+emb = model.encode(["test"])
+print("✅ Modèle téléchargé et encodage OK, shape:", emb.shape)
+```
+
+> 👉 Le modèle sera automatiquement téléchargé dans `~/.cache/torch/sentence_transformers/`
+> et réutilisé localement les prochaines fois (plus de 403, plus besoin d’internet).
+
+---
+
+## 🔑 Si tu as un modèle privé sur Hugging Face
+
+1. Crée un token sur [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+   → Scope minimal requis : `read`
+2. Ajoute dans ton `.bashrc` ou `.env` :
+
+   ```bash
+   export HUGGINGFACE_HUB_TOKEN=hf_xxx_ton_token_xxx
+   ```
+3. Vérifie la connexion :
+
+   ```bash
+   huggingface-cli login
+   ```
+4. Puis relance le script Python ci-dessus — il téléchargera le modèle avec ton token.
+
+---
+
+## 📦 Méthode 2 — Télécharger manuellement avec `git lfs`
+
+Si tu veux stocker le modèle toi-même dans un dossier spécifique (par exemple `models/embeddings`), exécute :
+
+```bash
+mkdir -p models/embeddings
+cd models/embeddings
+git lfs install
+git clone https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+```
+
+Puis dans ton code :
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("./models/embeddings/all-MiniLM-L6-v2")
+```
+
+✅ Ainsi le modèle est **totalement local**, aucun appel réseau.
+
+---
+
+## 🧩 Vérification rapide (sans script Python)
+
+Une fois le modèle téléchargé :
+
+```bash
+ls ~/.cache/torch/sentence_transformers/
+```
+
+ou si tu as cloné :
+
+```bash
+ls models/embeddings/all-MiniLM-L6-v2
+```
+
+Tu devrais voir des fichiers comme :
+
+```
+config.json
+modules.json
+sentence_bert_config.json
+pytorch_model.bin
+tokenizer.json
+vocab.txt
+```
+
+---
+
+## ⚙️ Résumé rapide
+
+| Cas                   | Commande / Action                                                         |
+| --------------------- | ------------------------------------------------------------------------- |
+| Modèle public         | `SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")`           |
+| Modèle privé          | `export HUGGINGFACE_HUB_TOKEN=hf_xxx`                                     |
+| Téléchargement manuel | `git clone https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2` |
+| Chargement local      | `SentenceTransformer("./models/embeddings/all-MiniLM-L6-v2")`             |
+
+---
+
+Souhaites-tu que je te donne la version du script qui **vérifie automatiquement si le modèle est déjà téléchargé** et le **télécharge sinon** (pour ton backend d’embedding) ? Ce serait pratique pour ton PoC.
