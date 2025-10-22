@@ -38,6 +38,10 @@ def ingest_local_all_files(root_dir="./local_code"):
     files = read_files_from_dir(root_dir)
     print(f"📝 {len(files)} fichiers trouvés.")
 
+    if not files:
+        print("⚠️ Aucun fichier à ingérer.")
+        return
+
     collection = get_collection()
     all_chunks, metadatas, ids = [], [], []
 
@@ -53,14 +57,19 @@ def ingest_local_all_files(root_dir="./local_code"):
         batch_texts = all_chunks[i:i+batch]
         batch_ids = ids[i:i+batch]
         batch_meta = metadatas[i:i+batch]
-        embs = embed_texts(batch_texts)
-        collection.add(
-            ids=batch_ids,
-            documents=batch_texts,
-            embeddings=embs,
-            metadatas=batch_meta
-        )
-    print("✅ Ingestion de tous les fichiers terminée dans ChromaDB")
+        try:
+            embs = embed_texts(batch_texts)
+            collection.add(
+                ids=batch_ids,
+                documents=batch_texts,
+                embeddings=embs,
+                metadatas=batch_meta
+            )
+            collection.persist()  # 🔑 Sauvegarde après chaque batch
+        except Exception as e:
+            print(f"⚠️ Erreur ingestion batch {i}-{i+batch}: {e}")
+
+    print(f"✅ Ingestion terminée. Total documents dans ChromaDB: {collection.count()}")
 
 if __name__ == "__main__":
     ingest_local_all_files("./local_code")
