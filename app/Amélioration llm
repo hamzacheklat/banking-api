@@ -1,0 +1,479 @@
+Voici **la configuration LLM optimale pour du code technique**, tous les paramètres (tokens, chunking, etc.) et **les fichiers modifiés prêts à remplacer dans ton repo**. Retour en **Markdown** comme demandé. Je fournis :
+
+* recommandations modèles & choix selon infra,
+* paramètres détaillés (temperature, max_tokens, chunk/token sizing, embeddings batch, etc.),
+* fichiers modifiés : `.env.example`, `app/config.py`, `app/ingest_confluence.py`, `app/litellm_client.py`, `app/rag.py`.
+
+> Remarque : je propose plusieurs modèles (du plus performant mais gourmand au plus léger). Choisis selon ton infra (GPU mémoire / CPU). Les fichiers utilisent le token-based chunking (plus fiable pour LLMs) via `transformers` tokenizer.
+
+---
+
+# ✅ Recommandations modèles (pour code technique)
+
+**Priorité haute (meilleurs résultats pour génération/complétion de code, mais exigeant en GPU/RAM)**
+
+1. **Code Llama - Code 34B** (`code-llama/34b-code`) — excellente compréhension du code, idéal pour revue, génération, explications techniques. (Nécessite GPU >40GB pour inference non quantifiée).
+2. **StarCoder / BigCode StarCoder** (`bigcode/starcoder`) — conçu pour code, très efficace pour complétion, plus accessible (≈16-32GB).
+3. **Code Llama - Code 7B** (`code-llama/7b-code`) — bon compromis qualité/vitesse pour infra modeste.
+
+**Alternative légère / rapide**
+
+* **StarCoder-Base / StarCoder-7B** — si mémoire limitée.
+* **Mistral, Mistral-instruct** — polyvalent, moins spécialisé pour code mais bon pour prompts techniques.
+
+**Si tu utilises une API (litellm remote)** : choisis le modèle disponible côté API (ex: `mistral/codestral-latest` dans ton exemple). Pour code, préfère explicitement un modèle *code-* ou *starcoder* si disponible.
+
+---
+
+# ⚙️ Paramètres recommandés (détaillés)
+
+> Ces valeurs sont des recommandations générales ; ajuste selon résultat et infra.
+
+### Génération LLM
+
+* `temperature`: **0.0 – 0.2**
+  → pour réponses factuelles et code fiable (éviter hallucinations).
+* `top_p`: **0.8 – 0.95** (optionnel si disponible).
+* `max_tokens` (réponse): **256 – 1024**
+  → pour explications longues ou refactorings prenons 512–1024, mais surveille le coût.
+* `presence_penalty` / `frequency_penalty`: **0.0 – 0.5** (0.2 utile si répétitions).
+* `stop_sequences`: définir si tu veux limiter la sortie (ex: `["\n\n### Fin"]`).
+
+### Prompting / System
+
+* **System prompt** : explicite le rôle et obliger à sourcer les réponses, ex:
+  `"You are a secure internal assistant. Answer only using the provided CONTEXTS. For each claim include the source title and url. If not in contexts, say 'Information not found in sources.'"`
+* **Format de sortie** : demander `SYNTHÈSE (3-4 lignes) + EXPLICATION DÉTAILLÉE + SOURCES LISTÉES`.
+
+### Chunking / Tokenization (très important)
+
+* Utilise **token-based chunking** (pas mot-based).
+* `CHUNK_TOKEN_SIZE`: **512 – 1200 tokens**
+
+  * Recommandé pour code technique : **700–900 tokens** (préserve plus de contexte par chunk).
+* `CHUNK_TOKEN_OVERLAP`: **50 – 200 tokens** (reco: **150**) pour garder le contexte entre chunks.
+* `min_chunk_tokens`: **50 tokens** (ignorer trop petits).
+* `embed_batch_size`: **32 – 64** (ajuster selon RAM).
+* `retrieval_top_k`: **5 – 10** (plus élevé si tu veux plus contexte).
+
+### Embeddings
+
+* Modèle embeddings : `sentence-transformers/all-MiniLM-L6-v2` si ressources limitées.
+  Pour meilleure qualité sémantique : `all-mpnet-base-v2`.
+* `EMB_FLOAT`: `float32` ; si tu utilises GPU/QUANTIZE, tu peux réduire à `float16`.
+
+### Chroma / Vector Store
+
+* `persist_directory` monté sur volume persistant.
+* Stocke métadatas complètes : `page_id`, `title`, `url`, `last_modified`, `author`, `hash`.
+* Sauvegarde snapshot quotidien.
+
+### Sécurité / Production
+
+* `temperature` bas, API keys via secret manager, CORS restreint, TLS.
+
+---
+
+# 🔧 Fichiers modifiés (à remplacer dans `backend/app`)
+
+Je fournis ci-dessous les fichiers complets modifiés. Ils intègrent :
+
+* token-based chunking (`transformers.AutoTokenizer`),
+* métadatas enrichies,
+* dedup via hash,
+* paramètres LLM étendus et exposés via `.env`,
+* renvoi des scores de similarité depuis Chroma (si disponible),
+* système de formatting de réponse pour demander langue flexible (pas forcément français).
+
+---
+
+## 1) `backend/.env.example` (modifié)
+
+```env
+# General
+CHROMA_DB_DIR=./chroma_db
+
+# Confluence
+CONFLUENCE_URL=https://wiki.cib.echonet
+CONFLUENCE_USERNAME=ton_user
+CONFLUENCE_PASSWORD=ton_password
+CONFLUENCE_SPACE=IV2
+
+# Embeddings
+LOCAL_EMB_MODEL=sentence-transformers/all-MiniLM-L6-v2
+EMB_BATCH_SIZE=32
+CHUNK_TOKEN_SIZE=800
+CHUNK_TOKEN_OVERLAP=150
+MIN_CHUNK_TOKENS=50
+
+# Tokenizer (pour chunking) - un modèle compatible HF tokenizer
+TOKENIZER_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+# LiteLLM / LLM
+# Options recommandées pour code : code-llama/34b-code (si dispo), bigcode/starcoder, code-llama/7b-code
+LITELLM_API_BASE=https://ai4devs.group.echonet/api/v1
+LITELLM_MODEL=bigcode/starcoder
+LITELLM_API_KEY=
+
+# Generation defaults
+LITELLM_TEMPERATURE=0.1
+LITELLM_TOP_P=0.95
+LITELLM_MAX_TOKENS=512
+
+# Misc
+EMB_DTYPE=float32
+```
+
+---
+
+## 2) `backend/app/config.py` (modifié)
+
+```python
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Chroma
+CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "./chroma_db")
+
+# Confluence
+CONFLUENCE_URL = os.getenv("CONFLUENCE_URL")
+CONFLUENCE_USERNAME = os.getenv("CONFLUENCE_USERNAME")
+CONFLUENCE_PASSWORD = os.getenv("CONFLUENCE_PASSWORD")
+CONFLUENCE_SPACE = os.getenv("CONFLUENCE_SPACE", "IV2")
+
+# Embeddings / Tokenizer
+LOCAL_EMB_MODEL = os.getenv("LOCAL_EMB_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+TOKENIZER_MODEL = os.getenv("TOKENIZER_MODEL", LOCAL_EMB_MODEL)
+EMB_BATCH_SIZE = int(os.getenv("EMB_BATCH_SIZE", "32"))
+CHUNK_TOKEN_SIZE = int(os.getenv("CHUNK_TOKEN_SIZE", "800"))
+CHUNK_TOKEN_OVERLAP = int(os.getenv("CHUNK_TOKEN_OVERLAP", "150"))
+MIN_CHUNK_TOKENS = int(os.getenv("MIN_CHUNK_TOKENS", "50"))
+EMB_DTYPE = os.getenv("EMB_DTYPE", "float32")
+
+# litellm
+LITELLM_API_BASE = os.getenv("LITELLM_API_BASE")
+LITELLM_MODEL = os.getenv("LITELLM_MODEL", "bigcode/starcoder")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "")
+
+# Generation defaults
+LITELLM_TEMPERATURE = float(os.getenv("LITELLM_TEMPERATURE", "0.1"))
+LITELLM_TOP_P = float(os.getenv("LITELLM_TOP_P", "0.95"))
+LITELLM_MAX_TOKENS = int(os.getenv("LITELLM_MAX_TOKENS", "512"))
+```
+
+---
+
+## 3) `backend/app/ingest_confluence.py` (modifié — token-based chunking, dedup)
+
+```python
+from atlassian import Confluence
+import config
+from embedder import embed_texts
+from vector_store import get_collection
+from tqdm import tqdm
+import html, re, uuid, hashlib
+from transformers import AutoTokenizer
+
+# initialize tokenizer once
+_tokenizer = None
+def get_tokenizer():
+    global _tokenizer
+    if _tokenizer is None:
+        _tokenizer = AutoTokenizer.from_pretrained(config.TOKENIZER_MODEL, use_fast=True)
+    return _tokenizer
+
+def html_to_text(html_content):
+    text = re.sub(r'<[^>]+>', ' ', html_content)
+    text = html.unescape(text)
+    return ' '.join(text.split())
+
+def fetch_pages_from_space():
+    confluence = Confluence(
+        url=config.CONFLUENCE_URL,
+        username=config.CONFLUENCE_USERNAME,
+        password=config.CONFLUENCE_PASSWORD
+    )
+    start = 0
+    limit = 50
+    pages = []
+    while True:
+        res = confluence.get_all_pages_from_space(config.CONFLUENCE_SPACE, start=start, limit=limit, expand='body.storage')
+        if not res:
+            break
+        for p in res:
+            content = p.get('body', {}).get('storage', {}).get('value', '')
+            text = html_to_text(content)
+            pages.append({
+                "id": p.get('id'),
+                "title": p.get('title'),
+                "text": text,
+                "url": f"{config.CONFLUENCE_URL}/pages/viewpage.action?pageId={p.get('id')}"
+            })
+        start += limit
+        if len(res) < limit:
+            break
+    return pages
+
+def token_chunk_text(text, tokenizer, chunk_size=config.CHUNK_TOKEN_SIZE, overlap=config.CHUNK_TOKEN_OVERLAP, min_tokens=config.MIN_CHUNK_TOKENS):
+    # Tokenize into ids to chunk reliably
+    toks = tokenizer.encode(text, add_special_tokens=False)
+    chunks = []
+    i = 0
+    L = len(toks)
+    while i < L:
+        end = min(i + chunk_size, L)
+        chunk_ids = toks[i:end]
+        # detokenize chunk back to text
+        chunk_text = tokenizer.decode(chunk_ids, clean_up_tokenization_spaces=True)
+        # skip too small chunks
+        if len(chunk_ids) >= min_tokens and chunk_text.strip():
+            chunks.append(chunk_text.strip())
+        i += chunk_size - overlap
+    return chunks
+
+def hash_text(t):
+    return hashlib.sha256(t.encode("utf-8")).hexdigest()
+
+def ingest_confluence(dry_run=False):
+    pages = fetch_pages_from_space()
+    collection = get_collection()
+
+    tokenizer = get_tokenizer()
+
+    all_chunks, metadatas, ids = [], [], []
+    seen_hashes = set()
+
+    for p in pages:
+        chunks = token_chunk_text(p["text"], tokenizer)
+        for c in chunks:
+            h = hash_text(c)
+            if h in seen_hashes:
+                continue
+            seen_hashes.add(h)
+            all_chunks.append(c)
+            metadatas.append({
+                "page_id": p["id"],
+                "title": p["title"],
+                "url": p.get("url")
+            })
+            ids.append(str(uuid.uuid4()))
+
+    if dry_run:
+        print(f"Found {len(all_chunks)} chunks (dry run).")
+        return
+
+    batch = config.EMB_BATCH_SIZE or 32
+    for i in tqdm(range(0, len(all_chunks), batch)):
+        batch_texts = all_chunks[i:i+batch]
+        batch_ids = ids[i:i+batch]
+        batch_meta = metadatas[i:i+batch]
+        embs = embed_texts(batch_texts)
+        collection.add(
+            ids=batch_ids,
+            documents=batch_texts,
+            embeddings=embs,
+            metadatas=batch_meta
+        )
+    print("✅ Ingestion Confluence terminée dans ChromaDB")
+
+if __name__ == "__main__":
+    ingest_confluence()
+```
+
+---
+
+## 4) `backend/app/litellm_client.py` (modifié — plus de params, format options)
+
+```python
+from litellm import completion
+import config
+import os
+from typing import List, Dict
+
+def generate_with_litellm(messages: List[Dict], temperature=None, max_tokens=None, top_p=None, model_name=None):
+    """
+    Wrapper to call litellm completion with defaults from config.
+    messages: list of {"role": "...", "content": "..."}
+    """
+    if config.LITELLM_API_KEY:
+        os.environ["LITELLM_API_KEY"] = config.LITELLM_API_KEY
+
+    temperature = config.LITELLM_TEMPERATURE if temperature is None else temperature
+    max_tokens = config.LITELLM_MAX_TOKENS if max_tokens is None else max_tokens
+    top_p = config.LITELLM_TOP_P if top_p is None else top_p
+    model_name = config.LITELLM_MODEL if model_name is None else model_name
+
+    resp = completion(
+        model=model_name,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        top_p=top_p,
+        api_base=config.LITELLM_API_BASE
+    )
+    # Attempt to extract text safely
+    try:
+        content = resp['choices'][0]['message']['content']
+    except Exception:
+        content = str(resp)
+    return content
+```
+
+---
+
+## 5) `backend/app/rag.py` (modifié — renvoi sources + scores, prompt format)
+
+```python
+from embedder import embed_texts
+from vector_store import get_collection
+from litellm_client import generate_with_litellm
+from datetime import datetime
+import config
+
+def chroma_search(query_embedding, top_k=5):
+    collection = get_collection()
+    # try to include distances if supported
+    try:
+        results = collection.query(query_embeddings=[query_embedding], n_results=top_k, include=["distances","metadatas","documents","ids"])
+    except TypeError:
+        results = collection.query(query_embeddings=[query_embedding], n_results=top_k)
+    docs = []
+    # navigate results robustly
+    ids = results.get("ids", [[]])[0]
+    docs_list = results.get("documents", [[]])[0]
+    metas = results.get("metadatas", [[]])[0]
+    dists = results.get("distances", [[]])[0] if results.get("distances") else [None]*len(ids)
+    for i in range(len(ids)):
+        docs.append({
+            "id": ids[i],
+            "content": docs_list[i] if i < len(docs_list) else "",
+            "metadata": metas[i] if i < len(metas) else {},
+            "score": None if dists[i] is None else float(dists[i])
+        })
+    return docs
+
+def build_messages(query, contexts, prefer_language=None):
+    # prefer_language: None (let model choose), or "fr", "en", etc.
+    system = {
+        "role": "system",
+        "content": (
+            "You are a secure internal assistant. Answer ONLY using the PROVIDED CONTEXTS. "
+            "For each factual claim, include the source with title and url in the format: [Title](url). "
+            "If the information is not present in contexts, answer: 'Information not found in sources.'"
+        )
+    }
+    # Compose contexts with metadata and small separator
+    context_text = "\n\n---\n\n".join([
+        f"Source: {c['metadata'].get('title','N/A')} | URL: {c['metadata'].get('url','')}\n\n{c['content']}"
+        for c in contexts
+    ])
+    lang_hint = ""
+    if prefer_language:
+        lang_hint = f"\nPreferred language for the answer: {prefer_language}.\n"
+    user = {
+        "role": "user",
+        "content": f"CONTEXTS:\n{context_text}\n\nQUESTION: {query}\n{lang_hint}\nProvide a concise answer (3-6 sentences) and then a detailed explanation. Use code blocks for code. End with 'SOURCES:' and list the sources used."
+    }
+    return [system, user]
+
+def answer_query(query, top_k=5, prefer_language=None):
+    q_emb = embed_texts([query])[0]
+    contexts = chroma_search(q_emb, top_k=top_k)
+    messages = build_messages(query, contexts, prefer_language=prefer_language)
+    answer = generate_with_litellm(messages,
+                                   temperature=config.LITELLM_TEMPERATURE,
+                                   max_tokens=config.LITELLM_MAX_TOKENS,
+                                   top_p=config.LITELLM_TOP_P,
+                                   model_name=config.LITELLM_MODEL)
+    return {
+        "answer": answer,
+        "contexts": contexts,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+```
+
+---
+
+## 6) `backend/app/embedder.py` (petite adaptation — dtype control)
+
+```python
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import config
+
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = SentenceTransformer(config.LOCAL_EMB_MODEL)
+    return _model
+
+def embed_texts(texts):
+    model = get_model()
+    embs = model.encode(texts, convert_to_numpy=True, show_progress_bar=False, batch_size=config.EMB_BATCH_SIZE)
+    # ensure dtype as configured
+    if config.EMB_DTYPE == "float32":
+        embs = embs.astype(np.float32)
+    elif config.EMB_DTYPE == "float16":
+        embs = embs.astype(np.float16)
+    else:
+        embs = embs.astype(np.float32)
+    return [e.tolist() for e in embs]
+```
+
+---
+
+# 🔎 Requirements — additions
+
+Dans `backend/requirements.txt` ajoute/assure la présence de :
+
+```
+transformers>=4.20.0
+sentence-transformers
+torch
+tqdm
+atlassian-python-api
+chromadb
+litellm
+python-dotenv
+```
+
+> Si tu es en CPU-only et veux Tokenizer rapide, installe `tokenizers`/`transformers` appropriés. `tiktoken` n'est pas obligatoire ici.
+
+---
+
+# ✅ Utilisation & exemples
+
+* Ingestion (token-based) : `python -m app.ingest_confluence`
+  (ou via ton endpoint `/ingest_confluence` exposé)
+
+* Query exemple (curl):
+
+```bash
+curl -X POST "http://localhost:8000/query" -H "Content-Type: application/json" -d '{
+  "session_id": "dev",
+  "query": "Comment déployer un service Python avec systemd ?",
+  "top_k": 6
+}'
+```
+
+* Pour demander réponse en anglais (ou autre), tu peux appeler `answer_query(query, prefer_language="en")` ou via UI envoyer `prefer_language` (j'ai inclus la logique).
+
+---
+
+# 🧩 Notes & conseils finaux rapides
+
+* **Choix du modèle** : si tu veux la meilleure qualité pour *code technique* et tu as GPUs → `code-llama/34b-code`. Si infra limitée → `bigcode/starcoder` ou `code-llama/7b-code`.
+* **Chunking token-based** : essentiel — évite perte de contexte ou découpage qui casse du code.
+* **Temperature basse** : pour fiabilité du code.
+* **Sourcer systématiquement** : utile en contexte interne (audit, traçabilité).
+* **Streaming** : si tu veux afficher la génération en direct dans Angular, je peux ajouter SSE / WebSocket (backend + frontend) — dis-moi si tu veux.
+
+---
+
+Si tu veux, je peux maintenant :
+
+* commiter **ces fichiers modifiés** dans un archive `.zip` prêt à cloner,
+* ou **générer** les autres fichiers optionnels (SSE streaming, K8s manifests, scripts CI) — dis-moi lesquels et je les ajoute directement.
