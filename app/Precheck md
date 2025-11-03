@@ -1,0 +1,16 @@
+Voici la version anglaise, reformulée de manière fluide et professionnelle pour ta documentation :
+
+---
+
+### 4. Additional Notes
+
+The **open** and **close** endpoints of the *globals* API allow opening and closing product actions based on **region**, **environment**, and **ecosystem**.
+Product closure is handled during the **DPI precheck** phase.
+
+> **Note:**
+> Currently, only the **oracle_cluster** product can be opened or closed.
+> For other products, a new `open/close product` call needs to be added in each **Rego** for all products.
+
+---
+
+Souhaites-tu que je reformate tout ton fichier Markdown pour y intégrer cette section proprement (titres, tableau, style cohérent) ?
