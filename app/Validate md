@@ -1,0 +1,90 @@
+Oui 👍 on peut faire **beaucoup plus simple**, tout en gardant ton objectif :
+➡️ les validations `region` et `techno` sont définies une seule fois dans `OpenAPIModel`
+➡️ et tu peux les appeler **manuellement** depuis n’importe quelle classe enfant, quel que soit le nom du champ.
+
+Pas besoin de décorateur `@validator`, ni de `__init_subclass__`.
+
+---
+
+### ✅ La version la plus simple et propre
+
+#### `base.py`
+
+```python
+from typing import ClassVar, Iterable, Optional
+from pydantic import BaseModel
+
+class ValidatorException(ValueError):
+    pass
+
+class OpenAPIModel(BaseModel):
+    REGIONS: ClassVar[Iterable[str]] = {"EMEA", "APAC", "AMERICAS"}
+    TECHNOLOGIES: ClassVar[Iterable[str]] = {"ORACLE", "POSTGRES", "MSSQL"}
+
+    @classmethod
+    def validate_region(cls, value: Optional[str]) -> Optional[str]:
+        if value and value.upper() not in cls.REGIONS:
+            raise ValidatorException(f"'{value}' is not part of {cls.REGIONS}")
+        return value
+
+    @classmethod
+    def validate_techno(cls, value: Optional[str]) -> Optional[str]:
+        if value and value.upper() not in cls.TECHNOLOGIES:
+            raise ValidatorException(f"'{value}' is not part of {cls.TECHNOLOGIES}")
+        return value
+```
+
+---
+
+#### `ckms_validators.py`
+
+Tu peux simplement appeler les fonctions dans un validator **manuel** à ta guise.
+
+```python
+from typing import Optional
+from pydantic import validator
+from base import OpenAPIModel
+
+class OnboardUserValidator(OpenAPIModel):
+    username: str
+    password: str
+    zone: Optional[str] = "EMEA"       # pas besoin de l'appeler "region"
+    engine: Optional[str] = "ORACLE"   # pas besoin de l'appeler "techno"
+
+    @validator("zone")
+    def check_zone(cls, v):
+        return cls.validate_region(v)
+
+    @validator("engine")
+    def check_engine(cls, v):
+        return cls.validate_techno(v)
+```
+
+---
+
+### ✨ Avantages
+
+✅ **Lisible** — pas de métadonnées, pas de magie cachée
+✅ **Facile à maintenir** — les règles sont dans `OpenAPIModel`, et tu les appelles quand tu veux
+✅ **Flexible** — tu choisis les champs à valider, même avec des noms différents
+✅ **Compatible Pydantic v1 et v2**
+
+---
+
+### Exemple d’utilisation
+
+```python
+user = OnboardUserValidator(username="admin", password="1234", zone="EMEA", engine="ORACLE")
+print(user)
+# ✅ OK
+
+user = OnboardUserValidator(username="admin", password="1234", zone="ANTARCTICA", engine="MYSQL")
+# ❌ lève ValidatorException("'ANTARCTICA' is not part of {'EMEA', 'APAC', 'AMERICAS'}")
+```
+
+---
+
+💡 Si tu veux aller encore plus loin plus tard (automatisation, champs dynamiques, etc.), tu pourras toujours ajouter un peu de logique automatique dans `OpenAPIModel.__init_subclass__` —
+mais cette version simple est **parfaite pour ton besoin actuel** : pas de duplication, facile à lire, et sans complexité inutile.
+
+Souhaites-tu que je te montre la version équivalente pour **Pydantic v2** (si tu es déjà passé dessus) ?
