@@ -1,0 +1,10 @@
+setup-precommit:
+    @echo "🔧 Setting up the pre-commit hook..."
+    mkdir -p .githooks
+    if [ ! -f pre-commit ]; then
+      echo "❌ Error: the file 'pre-commit' is missing." && exit 1
+    fi
+    cp pre-commit .githooks/pre-commit
+    chmod +x .githooks/pre-commit
+    git config core.hooksPath .githooks
+    @echo "✅ Pre-commit hook successfully configured!"
