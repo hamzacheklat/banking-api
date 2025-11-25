@@ -1,0 +1,142 @@
+/* ================================
+   UNIVERSAL MARKDOWN THEME (AWR-like)
+   ================================ */
+
+.markdown-container {
+  padding: 20px;
+  background: #fafafa;
+  color: #222;
+  font-family: "Segoe UI", Arial, sans-serif;
+  line-height: 1.55;
+  font-size: 15px;
+}
+
+/* ---------- TITRES ----------- */
+
+.markdown-container h1,
+.markdown-container h2,
+.markdown-container h3,
+.markdown-container h4 {
+  margin-top: 28px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #003f82;
+}
+
+.markdown-container h1 {
+  font-size: 1.9rem;
+  border-bottom: 3px solid #0057b8;
+  padding-bottom: 5px;
+}
+
+.markdown-container h2 {
+  font-size: 1.55rem;
+  border-bottom: 2px solid #1f6cd1;
+  padding-bottom: 3px;
+}
+
+.markdown-container h3 {
+  font-size: 1.3rem;
+  border-bottom: 1px solid #4a8de0;
+  padding-bottom: 2px;
+}
+
+.markdown-container h4 {
+  font-size: 1.1rem;
+  color: #334;
+}
+
+/* ---------- PARAGRAPHES ---------- */
+
+.markdown-container p {
+  margin-bottom: 12px;
+  color: #333;
+}
+
+/* ---------- LISTES ---------- */
+
+.markdown-container ul,
+.markdown-container ol {
+  margin: 10px 0 15px 25px;
+}
+
+.markdown-container li {
+  margin-bottom: 6px;
+}
+
+/* ---------- TABLEAUX ROBUSTES ---------- */
+
+.markdown-container table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  background: white;
+}
+
+.markdown-container th,
+.markdown-container td {
+  border: 1px solid #ccc;
+  padding: 8px 10px;
+}
+
+.markdown-container th {
+  background: #eaf1fb;
+  color: #003f82;
+  font-weight: 600;
+}
+
+.markdown-container tr:nth-child(even) {
+  background: #f6f6f6;
+}
+
+/* ---------- BLOC DE CODE ---------- */
+
+.markdown-container pre {
+  background: #efefef;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font-family: Consolas, monospace;
+  color: #333;
+}
+
+.markdown-container code {
+  background: #f0f0f0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: Consolas, monospace;
+  color: #b30000;
+}
+
+/* ---------- BLOCKQUOTES (sections, notes) ---------- */
+
+.markdown-container blockquote {
+  margin: 20px 0;
+  padding: 10px 15px;
+  border-left: 4px solid #0057b8;
+  background: #eef3fb;
+  color: #333;
+  border-radius: 4px;
+}
+
+/* ---------- TITRES DE SECTION non prévisibles ---------- */
+/* Permet de styliser tout texte "fort" généré par le LLM */
+
+.markdown-container strong {
+  color: #002d5c;
+}
+
+/* ---------- TABLES DÉSÉQUILIBRÉES ou NON-STANDARD ---------- */
+
+.markdown-container table td:first-child {
+  font-weight: 500;
+}
+
+/* Si le LLM génère une table sans <thead>, ça reste propre */
+.markdown-container table tr:first-child td {
+  background: #f1f6ff;
+  font-weight: 600;
+  color: #003f82;
+}
