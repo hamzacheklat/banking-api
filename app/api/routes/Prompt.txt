@@ -1,0 +1,29 @@
+Below is an Oracle performance diagnostic in JSON format.
+
+Your task is to:
+1. Analyze the overall performance situation (SQL, wait events, sessions, metrics, ASH).
+2. Identify the most likely root cause of the performance spike (CPU saturation, I/O bottleneck, locking, plan regression, index issue, TEMP spill, parameter change, resource limits, autoscaling).
+3. Deliver a short explanation (5–10 lines).
+
+Guidelines:
+- Correlate SQL_IDs across Top SQL, Wait Events, ASH, and Sessions.
+- Identify dominant SQL statements (high elapsed time, CPU time, IO, or time_waited).
+- Inspect execution plans for anomalies: full table scans, hash joins spilling to TEMP, missing indexes, high cardinality, plan drift.
+- Check if waits cluster around a specific SQL_ID or object.
+- Detect blocking chains or enqueue waits.
+- Look for modified parameters that could impact optimizer behavior.
+- Review ATP metrics for CPU saturation, IO pressure, or autoscaling triggers.
+- Use only the data visible in the JSON.
+
+Response format:
+{
+  "probable_cause": "short text describing the most likely root cause",
+  "key_observations": [
+      "observation 1",
+      "observation 2",
+      "observation 3"
+  ],
+  "summary": "5–10 lines explaining why this cause is the most likely"
+}
+
+Here is the JSON diagnostic data:
