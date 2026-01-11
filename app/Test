@@ -1,0 +1,116 @@
+<div class="modal-header">
+  <h5 class="modal-title">📊 ADDM Report</h5>
+  <button
+    type="button"
+    class="close"
+    aria-label="Close"
+    (click)="activeModal.dismiss()">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+
+<div class="modal-body">
+  <pre>{{ report }}</pre>
+</div>
+
+<div class="modal-footer">
+  <button
+    type="button"
+    class="btn btn-secondary"
+    (click)="activeModal.close()">
+    Close
+  </button>
+</div>
+
+
+/* ===== Modal container ===== */
+.modal-content {
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  border: none;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+
+/* ===== Header ===== */
+.modal-header {
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #ffffff;
+  padding: 14px 20px;
+  border-bottom: none;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+/* Close button */
+.modal-header .close {
+  color: #ffffff;
+  opacity: 0.9;
+  font-size: 22px;
+}
+
+.modal-header .close:hover {
+  opacity: 1;
+}
+
+/* ===== Body ===== */
+.modal-body {
+  padding: 20px;
+  max-height: 65vh;
+  overflow-y: auto;
+  background-color: #f8faff;
+}
+
+/* ADDM text formatting */
+.modal-body pre {
+  background-color: #ffffff;
+  border: 1px solid #dce3f0;
+  border-radius: 6px;
+  padding: 16px;
+  font-family: "Courier New", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1f2d3d;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ===== Footer ===== */
+.modal-footer {
+  background-color: #f1f5fb;
+  border-top: 1px solid #dce3f0;
+  padding: 12px 20px;
+}
+
+/* ===== Buttons ===== */
+.btn-secondary {
+  background-color: #2a5298;
+  border-color: #2a5298;
+  color: #ffffff;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  background-color: #1e3c72;
+  border-color: #1e3c72;
+}
+
+/* ===== Scrollbar (Chrome/Edge) ===== */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background-color: #b4c6e7;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background-color: #edf2fb;
+}
