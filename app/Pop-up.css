@@ -1,0 +1,110 @@
+/* =========================================================
+   DIALOG CONTAINER
+========================================================= */
+:host {
+  display: block;
+}
+
+/* Titre */
+h2 {
+  font-weight: 600;
+  color: var(--primary-color-darkest);
+  margin-bottom: 8px;
+}
+
+/* Contenu */
+mat-dialog-content {
+  padding-top: 12px;
+  padding-bottom: 4px;
+}
+
+/* Champs */
+.full {
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+/* Inputs */
+mat-form-field {
+  background: var(--white-color);
+}
+
+mat-form-field.mat-form-field-appearance-outline
+  .mat-form-field-outline {
+  color: var(--border-color);
+}
+
+mat-form-field.mat-focused
+  .mat-form-field-outline-thick {
+  color: var(--primary-color);
+}
+
+/* Labels */
+.mat-form-field-label {
+  color: var(--gray-color);
+}
+
+/* Texte input */
+.mat-input-element {
+  font-size: 15px;
+}
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+mat-dialog-actions {
+  padding: 16px 0 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Cancel */
+mat-dialog-actions button[mat-button] {
+  color: var(--gray-color-dark);
+}
+
+/* Save */
+mat-dialog-actions button[mat-raised-button] {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--primary-color-dark) 100%
+  );
+  color: white;
+  border-radius: 12px;
+  padding: 6px 20px;
+  font-weight: 600;
+}
+
+/* Hover */
+mat-dialog-actions button[mat-raised-button]:hover {
+  filter: brightness(1.05);
+}
+
+/* =========================================================
+   DIALOG SHELL (ombre & radius)
+========================================================= */
+::ng-deep .mat-dialog-container {
+  border-radius: 18px;
+  padding: 24px 28px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+@media (max-width: 480px) {
+  ::ng-deep .mat-dialog-container {
+    padding: 20px;
+  }
+
+  mat-dialog-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  mat-dialog-actions button {
+    width: 100%;
+  }
+}
