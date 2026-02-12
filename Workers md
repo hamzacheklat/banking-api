@@ -1,0 +1,203 @@
+Très bonne idée — tu veux donc **identifier à la fois** :
+
+✅ le serveur (hostname)
+✅ le worker
+sans casser Prometheus (cardinalité stable)
+
+C’est exactement le bon équilibre entre **observabilité** et **scalabilité** 👍
+
+---
+
+# 🧠 Principe important
+
+Chaque worker Sanic = **process séparé**
+
+👉 Ce qu’on veut :
+
+```
+server = hostname stable
+worker = ID stable pendant la vie du worker
+```
+
+⚠ On **évite** les UID random ou timestamps.
+
+---
+
+# ✅ Worker ID propre (recommandé)
+
+Le plus simple et fiable :
+
+👉 utiliser le **PID du worker**
+
+Pourquoi ?
+
+✔ unique par worker
+✔ stable tant que le worker vit
+✔ pas explosif pour Prometheus
+
+---
+
+# 🚀 Middleware Sanic — version complète serveur + worker
+
+Voici un middleware prêt à utiliser :
+
+```python
+import socket
+import os
+import time
+
+from prometheus_client import Counter, Histogram
+
+# ---- identifiers ----
+
+SERVER_ID = socket.gethostname()
+WORKER_ID = str(os.getpid())
+
+# ---- metrics ----
+
+REQUESTS = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["server", "worker", "method", "endpoint", "status"]
+)
+
+LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "Request latency",
+    ["server", "worker", "endpoint"],
+    buckets=(0.1, 0.3, 0.5, 1, 2, 5)
+)
+
+# ---- middleware ----
+
+@app.middleware("request")
+async def metrics_start(request):
+    request.ctx.start = time.time()
+
+
+@app.middleware("response")
+async def metrics_end(request, response):
+    duration = time.time() - request.ctx.start
+
+    endpoint = request.route.path if request.route else request.path
+    status = str(response.status)
+
+    REQUESTS.labels(
+        SERVER_ID,
+        WORKER_ID,
+        request.method,
+        endpoint,
+        status
+    ).inc()
+
+    LATENCY.labels(
+        SERVER_ID,
+        WORKER_ID,
+        endpoint
+    ).observe(duration)
+```
+
+---
+
+# 📊 Résultat Prometheus
+
+Prometheus verra :
+
+```
+http_requests_total{server="srv-1", worker="1234"}
+http_requests_total{server="srv-1", worker="1235"}
+```
+
+Parfait pour :
+
+✅ debugging worker
+✅ load balancing insight
+✅ saturation detection
+
+---
+
+# 🔥 Alternative avancée (worker index fixe)
+
+Si tu veux :
+
+```
+worker-1
+worker-2
+worker-3
+worker-4
+```
+
+Tu peux injecter une variable env au démarrage :
+
+```bash
+WORKER_ID=1 sanic app
+```
+
+ou via Kubernetes:
+
+```yaml
+env:
+- name: WORKER_ID
+  value: "1"
+```
+
+Puis :
+
+```python
+WORKER_ID = os.getenv("WORKER_ID", str(os.getpid()))
+```
+
+---
+
+# ⚠ Cardinalité — important
+
+Tu as :
+
+```
+4 serveurs × 4 workers = 16 labels
+```
+
+👉 totalement safe pour Prometheus.
+
+Ce qui serait dangereux :
+
+```
+worker=random-id-per-request ❌
+```
+
+---
+
+# 🏆 Recommandation pro
+
+Toujours inclure worker label seulement sur :
+
+✔ http metrics
+✔ saturation metrics
+
+Pas sur metrics ultra fréquentes inutiles.
+
+---
+
+# ✅ TL;DR
+
+```
+server → hostname
+worker → PID ou index fixe
+```
+
+stable
+lisible
+Prometheus safe
+
+---
+
+Si tu veux, je peux te montrer ensuite :
+
+👉 multiprocess Prometheus + workers
+👉 dashboard Grafana serveur/worker
+👉 alertes worker crash
+👉 saturation alert
+👉 autoscaling basé worker load
+👉 heatmap worker latency
+
+Dis-moi 🚀
