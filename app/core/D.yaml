@@ -1,0 +1,17 @@
+scrape_configs:
+  - job_name: "ckms-metrics"
+    scheme: https
+    metrics_path: /ckms/health/metrics
+
+    tls_config:
+      insecure_skip_verify: true
+
+    static_configs:
+      - targets:
+          - eurvli1118164.xmp.net.intra:443
+          - eurvli1118165.xmp.net.intra:443
+          - eurvli1118060.xmp.net.intra:443
+          - eurvli1118061.xmp.net.intra:443
+
+    http_headers:
+      Host: database-services-stg.xmp.net.intra
