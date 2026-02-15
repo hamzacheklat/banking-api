@@ -1,0 +1,132 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "grade_a_dashboard",
+    "title": "Monitoring APIs Grade A",
+    "tags": ["monitoring", "grade-a", "api"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "version": 1,
+    "refresh": "5s",
+    "templating": {
+      "list": [
+        {
+          "type": "query",
+          "name": "api",
+          "label": "API",
+          "query": "label_values(http_request_duration_seconds_count, api)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "current": {"text": "All", "value": ".*"}
+        },
+        {
+          "type": "query",
+          "name": "status",
+          "label": "Status",
+          "query": "label_values(http_requests_total, status)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "current": {"text": "All", "value": ".*"}
+        }
+      ]
+    },
+    "panels": [
+      {
+        "type": "row",
+        "title": "Global Metrics",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "type": "graph",
+        "title": "Total RPS",
+        "targets": [
+          {
+            "expr": "sum by (api) (rate(http_request_duration_seconds_count{api=~\"$api\"}[5m]))",
+            "legendFormat": "{{api}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1}
+      },
+      {
+        "type": "graph",
+        "title": "P95 Latency (s) Global",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by (le, api) (rate(http_request_duration_seconds_bucket{api=~\"$api\"}[5m])))",
+            "legendFormat": "{{api}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1}
+      },
+      {
+        "type": "graph",
+        "title": "Error Rate (All Status)",
+        "targets": [
+          {
+            "expr": "sum by (api, status) (rate(http_requests_total{api=~\"$api\", status=~\"$status\"}[5m])) / sum by (api) (rate(http_requests_total{api=~\"$api\"}[5m]))",
+            "legendFormat": "{{api}} - {{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9}
+      },
+      {
+        "type": "table",
+        "title": "Top 5 Endpoints (P95 Latency)",
+        "targets": [
+          {
+            "expr": "topk(5, histogram_quantile(0.95, sum by (le, endpoint) (rate(http_request_duration_seconds_bucket{api=~\"$api\"}[5m]))))",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9}
+      },
+      {
+        "type": "graph",
+        "title": "Latency per Server (P95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by (le, endpoint, server) (rate(http_request_duration_seconds_bucket{api=~\"$api\"}[5m])))",
+            "legendFormat": "{{endpoint}} - {{server}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 17}
+      }
+    ]
+  },
+  "alerting": {
+    "list": [
+      {
+        "alert": "HighLatencyP95",
+        "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(http_request_duration_seconds_bucket{api=~\"$api\"}[5m]))) > 1.5",
+        "for": "5m",
+        "labels": {"severity": "critical"},
+        "annotations": {
+          "summary": "P95 latency too high",
+          "description": "Endpoint {{ $labels.endpoint }} exceeds 1.5s"
+        }
+      },
+      {
+        "alert": "HighErrorRate",
+        "expr": "sum by (endpoint) (rate(http_requests_total{api=~\"$api\", status=~\"5..\"}[5m])) / sum by (endpoint) (rate(http_requests_total{api=~\"$api\"}[5m])) > 0.05",
+        "for": "5m",
+        "labels": {"severity": "critical"},
+        "annotations": {
+          "summary": "High error rate",
+          "description": "Endpoint {{ $labels.endpoint }} has >5% errors"
+        }
+      },
+      {
+        "alert": "EndpointNoTraffic",
+        "expr": "sum by (endpoint) (rate(http_request_duration_seconds_count{api=~\"$api\"}[10m])) == 0",
+        "for": "10m",
+        "labels": {"severity": "warning"},
+        "annotations": {
+          "summary": "No traffic",
+          "description": "Endpoint {{ $labels.endpoint }} received no traffic for 10min"
+        }
+      }
+    ]
+  }
+}
