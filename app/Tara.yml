@@ -1,0 +1,103 @@
+Voici ton **`deployment.yaml` complet corrigé** avec :
+
+✅ `securityContext` conforme Kyverno
+✅ `resources` obligatoires
+✅ support `readOnlyRootFilesystem` (avec `/tmp` writable)
+✅ ton configMap blackbox conservé
+
+---
+
+## ✅ **deployment.yaml (à jour)**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apis-exporter
+  namespace: "monitoring-{{env}}-administration-emea"
+  labels:
+    app: apis-exporter
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: apis-exporter
+
+  template:
+    metadata:
+      labels:
+        app: apis-exporter
+
+    spec:
+      containers:
+        - name: apis-exporter
+          image: prom/blackbox-exporter:v0.24.0
+
+          args:
+            - "--config.file=/etc/blackbox_exporter/blackbox.yml"
+
+          ports:
+            - containerPort: 9115
+              name: metrics
+
+          # ✅ Security policy Kyverno
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+
+          # ✅ Resources obligatoires
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/blackbox_exporter
+              readOnly: true
+
+            # nécessaire si readOnlyRootFilesystem=true
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: config
+          configMap:
+            name: apis-exporter-config
+            items:
+              - key: blackbox.yml
+                path: blackbox.yml
+
+        # volume writable pour l'app
+        - name: tmp
+          emptyDir: {}
+```
+
+---
+
+## 🚀 Ce que ça corrige
+
+* `allowPrivilegeEscalation` → false ✅
+* `readOnlyRootFilesystem` → true ✅
+* `resources requests + limits` obligatoires ✅
+* filesystem writable pour éviter crash exporter ✅
+
+---
+
+Si tu veux, je peux aussi te donner :
+
+✅ la version **Kyverno "restricted" ultra stricte** (PodSecurity level)
+✅ ton `configmap.yaml` compatible
+✅ un `kustomize` patch propre
+✅ comment tester avant apply (`kubectl diff`, `kyverno apply`)
+
+Dis-moi 👍
