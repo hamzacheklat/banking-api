@@ -1,0 +1,181 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "apis-metrics-grade-a",
+    "title": "APIs Metrics",
+    "tags": ["api", "prometheus", "grade-a"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "version": 2,
+    "refresh": "10s",
+
+    "templating": {
+      "list": [
+        {
+          "name": "api",
+          "label": "API",
+          "type": "custom",
+          "query": "ckms,delphix,globals,precheck,databases",
+          "current": {
+            "text": "delphix",
+            "value": "delphix"
+          },
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*"
+        },
+        {
+          "name": "endpoint",
+          "label": "Endpoint",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PROMETHEUS_DS"
+          },
+          "query": "label_values(http_request_duration_seconds_count{api=~\"$api\"}, endpoint)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*"
+        },
+        {
+          "name": "server",
+          "label": "Server",
+          "type": "query",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PROMETHEUS_DS"
+          },
+          "query": "label_values(process_cpu_seconds_total, instance)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*"
+        }
+      ]
+    },
+
+    "panels": [
+      {
+        "type": "stat",
+        "title": "Total RPS",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_seconds_count{api=~\"$api\"}[5m]))"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 }
+      },
+
+      {
+        "type": "stat",
+        "title": "P95 Latency (s)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{api=~\"$api\"}[5m])))"
+          }
+        ],
+        "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 }
+      },
+
+      {
+        "type": "stat",
+        "title": "Error Rate 5xx (%)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "100 * sum(rate(http_requests_total{api=~\"$api\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{api=~\"$api\"}[5m]))"
+          }
+        ],
+        "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 }
+      },
+
+      {
+        "type": "stat",
+        "title": "CPU Usage",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(process_cpu_seconds_total[5m]))"
+          }
+        ],
+        "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 }
+      },
+
+      {
+        "type": "stat",
+        "title": "Memory RSS (MB)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024"
+          }
+        ],
+        "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 }
+      },
+
+      {
+        "type": "graph",
+        "title": "RPS by Endpoint",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(http_request_duration_seconds_count{api=~\"$api\",endpoint=~\"$endpoint\"}[5m]))",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 4, "w": 24, "h": 6 }
+      },
+
+      {
+        "type": "table",
+        "title": "Endpoints in Error (5xx)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(http_requests_total{api=~\"$api\",status=~\"5..\"}[5m]))"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 10, "w": 12, "h": 6 }
+      },
+
+      {
+        "type": "table",
+        "title": "Top 5 Slowest Endpoints (P95)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PROMETHEUS_DS"
+        },
+        "targets": [
+          {
+            "expr": "topk(5, histogram_quantile(0.95, sum by (le, endpoint) (rate(http_request_duration_seconds_bucket{api=~\"$api\"}[5m]))))"
+          }
+        ],
+        "gridPos": { "x": 12, "y": 10, "w": 12, "h": 6 }
+      }
+    ]
+  },
+
+  "overwrite": true
+}
