@@ -1,0 +1,8 @@
+{
+  "/api": {
+    "target": "https://oracle-tuning-advisor-emea-stg.cib.echonet",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}
